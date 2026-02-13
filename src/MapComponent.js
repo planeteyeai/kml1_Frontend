@@ -6,8 +6,43 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import 'leaflet-geosearch/dist/geosearch.css';
 import L from 'leaflet';
+import 'leaflet-draw'; // Force load GeometryUtil
 import { kml } from "@tmcw/togeojson";
 import API_URL from './config';
+import { useAuth } from './AuthContext';
+
+// Global override for Leaflet distance formatting
+const applyDistanceOverride = () => {
+    const targetL = window.L || L;
+    if (targetL && targetL.GeometryUtil) {
+        targetL.GeometryUtil.readableDistance = function (distance, metric) {
+            if (metric !== false) { // Default to metric
+                if (distance >= 1000) {
+                    return (distance / 1000).toFixed(3) + ' km';
+                }
+                return distance.toFixed(2) + ' m';
+            }
+            // Non-metric fallback
+            const ft = distance * 3.2808399;
+            if (ft > 5280) {
+                return (ft / 5280).toFixed(3) + ' mi';
+            }
+            return ft.toFixed(2) + ' ft';
+        };
+        console.log("Distance override applied to", targetL === window.L ? "window.L" : "local L");
+    }
+};
+
+// Apply immediately and also on a delay to catch late-loading Leaflet
+  applyDistanceOverride();
+  setTimeout(applyDistanceOverride, 1000);
+  setTimeout(applyDistanceOverride, 3000);
+
+  // Configure Leaflet.draw tooltips for precision
+  if (L.drawLocal) {
+    L.drawLocal.draw.handlers.polyline.tooltip.cont = 'Click to continue drawing line. Length: ';
+    L.drawLocal.draw.handlers.polyline.tooltip.end = 'Click last point to finish line. Total: ';
+  }
 
 // Fix for default marker icon not showing correctly in some builds
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -61,7 +96,8 @@ const SearchControl = ({ visible }) => {
 };
 
 const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffset, onSaveSuccess, initialGeoJson }, ref) => {
-  const position = [18.335, 73.853]; // Set a more relevant default (Pune area based on your data)
+  const { token } = useAuth();
+  const position = [18.5204, 73.8567]; // Pune center
   const [geoJsonData, setGeoJsonData] = useState(null);
   const [dataKey, setDataKey] = useState(0);
   const [isDataVisible, setIsDataVisible] = useState(false);
@@ -85,11 +121,13 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
     }
   }, [initialGeoJson]);
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
       // Clear existing data before uploading new KML
-      handleClearAll(true);
+      // We MUST await this to prevent race conditions where the clear-all 
+      // finishes after the new data is loaded.
+      await handleClearAll(true);
 
       setIsDataVisible(true); // Hide search bar when uploading
       // 1. Upload file to server
@@ -103,6 +141,9 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
 
       fetch(`${API_URL}/upload-kml`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData,
       })
       .then(response => response.json())
@@ -142,7 +183,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
     }
   };
 
-  // Zoom to layer when geoJsonData changes
+  // Zoom to layer with improved padding and maxZoom
   const ZoomToLayer = ({ data }) => {
     const map = useMap();
     useEffect(() => {
@@ -152,7 +193,11 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
           if (layer.getLayers().length > 0) {
             const bounds = layer.getBounds();
             if (bounds.isValid()) {
-              map.fitBounds(bounds);
+              map.fitBounds(bounds, { 
+                padding: [50, 50], 
+                maxZoom: 18,
+                animate: true 
+              });
             }
           }
         } catch (e) {
@@ -206,6 +251,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(payload),
       });
@@ -237,7 +283,10 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
     try {
       // 1. Tell server to clear all data
       const response = await fetch(`${API_URL}/clear-all`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       
       const result = await response.json();
@@ -266,13 +315,13 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
     handleClearAll
   }));
 
-  const _onCreated = (e) => {
+  const _onCreated = async (e) => {
     console.log("Created: ", e);
     
     // If we are starting a fresh drawing and there's existing data, 
     // we clear it first to ensure a clean slate for the new entry.
     if (geoJsonData || drawnFeatures.length > 0) {
-      handleClearAll(true);
+      await handleClearAll(true);
     }
 
     setIsDataVisible(true); 
@@ -332,23 +381,38 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
           style={{ display: 'none' }}
         />
       </div>
-      <MapContainer center={position} zoom={18} scrollWheelZoom={true} maxZoom={24} style={{ height: '100%', width: '100%' }}>
+      <MapContainer 
+        center={position} 
+        zoom={18} 
+        scrollWheelZoom={true} 
+        maxZoom={24} 
+        style={{ height: '100%', width: '100%' }}
+        key={dataKey}
+      >
         <SearchControl visible={!isDataVisible} />
         <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Google Streets">
+          <LayersControl.BaseLayer checked name="Google Satellite">
             <TileLayer
-              url="http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+              url="https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}"
+              subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
+              attribution='&copy; Google Maps'
               maxZoom={24}
               maxNativeZoom={20}
-              subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
             />
           </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="Google Satellite">
+          <LayersControl.BaseLayer name="Google Streets">
             <TileLayer
-              url="http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}"
+              url="https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+              subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
+              attribution='&copy; Google Maps'
               maxZoom={24}
               maxNativeZoom={20}
-              subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="OpenStreetMap">
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             />
           </LayersControl.BaseLayer>
         </LayersControl>
@@ -363,7 +427,11 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
               circle: false,
               circlemarker: false,
               marker: true,
-              polyline: true,
+              polyline: {
+                metric: true,
+                showLength: true,
+                precision: 2
+              },
               polygon: true,
             }}
           />

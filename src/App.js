@@ -3,9 +3,14 @@ import logo from './logo.svg';
 import './App.css';
 import MapComponent from './MapComponent';
 import PipelineView from './PipelineView';
+import Login from './Login';
+import Register from './Register';
+import { useAuth } from './AuthContext';
 import API_URL from './config';
 
 function App() {
+  const { user, token, logout, loading: authLoading } = useAuth();
+  const [isRegistering, setIsRegistering] = useState(false);
   const [chainage, setChainage] = useState('');
   const [offsetType, setOffsetType] = useState('');
   const [laneCount, setLaneCount] = useState('2');
@@ -18,7 +23,13 @@ function App() {
 
   // Load last saved data on mount
   useEffect(() => {
-    fetch(`${API_URL}/data`)
+    if (!token) return;
+
+    fetch(`${API_URL}/data`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
       .then(res => res.json())
       .then(data => {
         if (data && data.length > 0) {
@@ -38,16 +49,24 @@ function App() {
         }
       })
       .catch(err => console.error("Error loading initial data:", err));
-  }, []);
+  }, [token]);
+
+  if (authLoading) {
+    return <div className="loading-screen">Loading...</div>;
+  }
+
+  if (!user) {
+    return isRegistering ? (
+      <Register onSwitchToLogin={() => setIsRegistering(false)} />
+    ) : (
+      <Login onSwitchToRegister={() => setIsRegistering(true)} />
+    );
+  }
 
   const handleSaveSuccess = (path) => {
     setLastSavedPath(path);
-    // Extract the folder path (remove filename)
     const folderPath = path.split('/').slice(0, -1).join('/');
     setPipelineInitialPath(folderPath);
-    
-    // Auto-clear removed as per user request
-    // We keep the notification visible so the user knows it's saved
   };
 
   const handleTriggerSave = () => {
@@ -70,6 +89,12 @@ function App() {
 
   return (
     <div className="App">
+      <header className="app-header">
+        <div className="user-info">
+          <span>Welcome, <strong>{user.username}</strong></span>
+          <button className="logout-button" onClick={logout}>Logout</button>
+        </div>
+      </header>
       <div className="main-content">
         <div className="map-section">
           <MapComponent 

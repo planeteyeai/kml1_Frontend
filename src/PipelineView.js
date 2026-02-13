@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import './PipelineView.css';
 import API_URL from './config';
+import { useAuth } from './AuthContext';
 
 const PipelineView = ({ onClose, initialPath = '' }) => {
+  const { token } = useAuth();
   const [items, setItems] = useState([]);
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [loading, setLoading] = useState(true);
 
   const fetchItems = (path = '') => {
     setLoading(true);
-    fetch(`${API_URL}/pipeline-folders?path=${encodeURIComponent(path)}`)
+    fetch(`${API_URL}/pipeline-folders?path=${encodeURIComponent(path)}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -34,7 +40,7 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
     } else {
       // It's a file, maybe download or view it?
       // For now, let's open it in a new tab if it's served statically
-      window.open(`${API_URL}/pipeline-files/${item.path}`, '_blank');
+      window.open(`${API_URL}/pipeline-files/${item.path}?token=${token}`, '_blank');
     }
   };
 
@@ -53,9 +59,9 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
   const handleDownloadClick = (e, item) => {
     e.stopPropagation(); // Prevent folder opening
     if (item.type === 'folder') {
-      window.location.href = `${API_URL}/download-folder?path=${encodeURIComponent(item.path)}`;
+      window.location.href = `${API_URL}/download-folder?path=${encodeURIComponent(item.path)}&token=${token}`;
     } else {
-      window.open(`${API_URL}/pipeline-files/${item.path}`, '_blank');
+      window.open(`${API_URL}/pipeline-files/${item.path}?token=${token}`, '_blank');
     }
   };
 
