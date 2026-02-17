@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
+  const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,53 +28,68 @@ export const AuthProvider = ({ children }) => {
       stored = {};
     }
 
-    let { token: savedToken, username: savedUsername, deviceId: savedDeviceId } =
-      stored;
+    let {
+      token: savedToken,
+      username: savedUsername,
+      deviceId: savedDeviceId,
+      remember: savedRemember,
+    } = stored;
 
     if (!savedDeviceId) {
       savedDeviceId = generateDeviceId();
     }
 
-    if (savedToken && savedUsername) {
+    if (savedRemember && savedToken && savedUsername) {
       setToken(savedToken);
       setUser({ username: savedUsername });
     }
 
     setDeviceId(savedDeviceId);
+    setRemember(!!savedRemember);
 
     const nextStored = {
       ...stored,
       deviceId: savedDeviceId,
+      remember: !!savedRemember,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStored));
     setLoading(false);
   }, []);
 
-  const login = (userData, userToken) => {
+  const login = (userData, userToken, shouldRemember) => {
     const ensuredDeviceId = deviceId || generateDeviceId();
     setUser(userData);
     setToken(userToken);
     setDeviceId(ensuredDeviceId);
+    setRemember(!!shouldRemember);
+
     const stored = {
-      username: userData.username,
-      token: userToken,
       deviceId: ensuredDeviceId,
+      remember: !!shouldRemember,
     };
+
+    if (shouldRemember) {
+      stored.username = userData.username;
+      stored.token = userToken;
+    }
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
   };
 
   const logout = () => {
     setUser(null);
     setToken(null);
+    setRemember(false);
     const stored = {
       deviceId: deviceId || generateDeviceId(),
+      remember: false,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, token, deviceId, login, logout, loading }}
+      value={{ user, token, deviceId, remember, login, logout, loading }}
     >
       {children}
     </AuthContext.Provider>

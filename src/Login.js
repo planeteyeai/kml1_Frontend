@@ -8,6 +8,7 @@ const Login = ({ onSwitchToRegister }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const { login } = useAuth();
 
   const handleSubmit = async (e) => {
@@ -27,7 +28,7 @@ const Login = ({ onSwitchToRegister }) => {
       const data = await response.json();
 
       if (data.success) {
-        login({ username: data.username }, data.token);
+        login({ username: data.username }, data.token, rememberMe);
       } else {
         setError(data.message || 'Login failed');
       }
@@ -53,6 +54,16 @@ const Login = ({ onSwitchToRegister }) => {
               required
               placeholder="Enter username"
             />
+          </div>
+          <div className="auth-input-group auth-remember-row">
+            <label className="remember-label">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />{' '}
+              Remember me
+            </label>
           </div>
           <div className="auth-input-group">
             <label>Password</label>
