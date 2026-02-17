@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './PipelineView.css';
 import API_URL from './config';
 import { useAuth } from './AuthContext';
@@ -9,7 +9,7 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [loading, setLoading] = useState(true);
 
-  const fetchItems = (path = '') => {
+  const fetchItems = useCallback((path = '') => {
     setLoading(true);
     fetch(`${API_URL}/pipeline-folders?path=${encodeURIComponent(path)}`, {
       headers: {
@@ -28,11 +28,11 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
         console.error("Error fetching pipeline items:", err);
         setLoading(false);
       });
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchItems(initialPath);
-  }, [initialPath]);
+  }, [fetchItems, initialPath]);
 
   const handleItemClick = (item) => {
     if (item.type === 'folder') {

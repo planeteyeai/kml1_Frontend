@@ -1,16 +1,25 @@
-import React, { useState, useRef, useEffect } from 'react';
-import logo from './logo.svg';
-import './App.css';
-import MapComponent from './MapComponent';
-import PipelineView from './PipelineView';
-import Login from './Login';
-import Register from './Register';
-import { useAuth } from './AuthContext';
-import API_URL from './config';
+import React, { useState, useRef, useEffect } from "react";
+import "./App.css";
+import MapComponent from "./MapComponent";
+import PipelineView from "./PipelineView";
+import Login from "./Login";
+import Register from "./Register";
+import { useAuth } from "./AuthContext";
+import API_URL from "./config";
+import DistressReport from "./DistressReport";
+import DistressPredicted from "./DistressPredicted";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useNavigate,
+} from "react-router-dom";
 
-function App() {
+function MainKmlApp() {
   const { user, token, logout, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [isRegistering, setIsRegistering] = useState(false);
+  const [showLanding, setShowLanding] = useState(true);
   const [chainage, setChainage] = useState('');
   const [offsetType, setOffsetType] = useState('');
   const [laneCount, setLaneCount] = useState('2');
@@ -63,6 +72,102 @@ function App() {
     );
   }
 
+  if (showLanding) {
+    return (
+      <div className="App landing-screen-root">
+        <div className="landing-topbar">
+          <div className="landing-brand">
+            <div className="landing-logo-dot" />
+            <span className="landing-brand-text">KML Tools</span>
+          </div>
+          <div className="landing-top-actions">
+            <div className="landing-user-info">
+              <span className="landing-user-name">
+                Welcome, <strong>{user.username}</strong>
+              </span>
+              <button
+                type="button"
+                className="landing-logout-button"
+                onClick={logout}
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="landing-background">
+          <div className="landing-content">
+            <h1 className="landing-title">Welcome to KML Tools</h1>
+            <p className="landing-subtitle">
+              Choose how you want to manage road and distress data
+            </p>
+            <div className="landing-card-grid">
+              <button
+                className="landing-card landing-card-primary"
+                onClick={() => setShowLanding(false)}
+              >
+                <div className="landing-card-logo landing-card-logo-kml">
+                  <img
+                    src="/KML_Creation.png"
+                    alt="KML Creation"
+                    className="landing-card-logo-image"
+                  />
+                </div>
+                <div className="landing-card-label">KML Creation</div>
+                <div className="landing-card-description">
+                  Draw alignments, generate precise KML files and pipeline outputs.
+                </div>
+                <div className="landing-card-footer">
+                  <span className="landing-card-cta primary">Get Started</span>
+                </div>
+              </button>
+              <button
+                className="landing-card landing-card-secondary"
+                type="button"
+                onClick={() => navigate("/distress-report")}
+              >
+                <div className="landing-card-logo landing-card-logo-distress">
+                  <img
+                    src="/Distress_report.png"
+                    alt="Distress Report"
+                    className="landing-card-logo-image"
+                  />
+                </div>
+                <div className="landing-card-label">Distress Report</div>
+                <div className="landing-card-description">
+                  Prepare and manage distress reporting for your projects.
+                </div>
+                <div className="landing-card-footer">
+                  <span className="landing-card-cta secondary">Get Started</span>
+                </div>
+              </button>
+              <button
+                className="landing-card landing-card-secondary"
+                type="button"
+                onClick={() => navigate("/distress-predicted")}
+              >
+                <div className="landing-card-logo landing-card-logo-Predicted">
+                  <img
+                    src="/Destress_Predicted.png"
+                    alt="Distress Predicted"
+                    className="landing-card-logo-image"
+                  />
+                </div>
+                <div className="landing-card-label">Distress Predicted</div>
+                <div className="landing-card-description">
+                  Advanced distress detection and analytics.
+                </div>
+                <div className="landing-card-footer">
+                  <span className="landing-card-cta secondary">Get Started</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const handleSaveSuccess = (path) => {
     setLastSavedPath(path);
     const folderPath = path.split('/').slice(0, -1).join('/');
@@ -90,9 +195,23 @@ function App() {
   return (
     <div className="App">
       <header className="app-header">
+        <div className="app-header-left">
+          <button
+            type="button"
+            className="app-back-button"
+            onClick={() => setShowLanding(true)}
+          >
+            ← Back
+          </button>
+          <span className="app-header-title">KML Creation</span>
+        </div>
         <div className="user-info">
-          <span>Welcome, <strong>{user.username}</strong></span>
-          <button className="logout-button" onClick={logout}>Logout</button>
+          <span>
+            Welcome, <strong>{user.username}</strong>
+          </span>
+          <button className="logout-button" onClick={logout}>
+            Logout
+          </button>
         </div>
       </header>
       <div className="main-content">
@@ -190,21 +309,28 @@ function App() {
               className="clear-button"
               onClick={handleReset}
               style={{ 
-                marginTop: '10px', 
+                marginTop: '8px', 
                 width: '100%', 
-                padding: '12px', 
+                padding: '9px 12px', 
                 backgroundColor: '#e74c3c', 
                 color: 'white', 
                 border: 'none', 
-                borderRadius: '4px', 
+                borderRadius: '999px', 
                 cursor: 'pointer',
-                fontWeight: 'bold'
+                fontWeight: '600',
+                fontSize: '0.9rem'
               }}
             >
               Clear All Data
             </button>
             <div style={{ marginTop: '15px', textAlign: 'center' }}>
-              <a href="#" className="one-link" onClick={(e) => { e.preventDefault(); setShowPipeline(true); }}>go to the kml_pipeline </a>
+              <button
+                type="button"
+                className="one-link"
+                onClick={() => setShowPipeline(true)}
+              >
+                go to the kml_pipeline
+              </button>
             </div>
           </div>
         </div>
@@ -219,6 +345,18 @@ function App() {
         />
       )}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/distress-report" element={<DistressReport />} />
+        <Route path="/distress-predicted" element={<DistressPredicted />} />
+        <Route path="/*" element={<MainKmlApp />} />
+      </Routes>
+    </Router>
   );
 }
 

@@ -10,6 +10,8 @@ import 'leaflet-draw'; // Force load GeometryUtil
 import { kml } from "@tmcw/togeojson";
 import API_URL from './config';
 import { useAuth } from './AuthContext';
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Global override for Leaflet distance formatting
 const applyDistanceOverride = () => {
@@ -45,8 +47,6 @@ const applyDistanceOverride = () => {
   }
 
 // Fix for default marker icon not showing correctly in some builds
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 let DefaultIcon = L.icon({
     iconUrl: icon,

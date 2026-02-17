@@ -4,25 +4,30 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.85);
+  background-color: rgba(2, 6, 23, 0.9);
   z-index: 2000;
   display: flex;
   justify-content: center;
   align-items: center;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(18px);
 }
 
 .pipeline-container {
-  background-color: #2c3e50;
+  background:
+    radial-gradient(circle at top left, rgba(56,189,248,0.16), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(168,85,247,0.16), transparent 55%),
+    rgba(15, 23, 42, 0.82);
   width: 80%;
   max-width: 900px;
   height: 70%;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  border-radius: 24px;
+  box-shadow:
+    0 24px 60px rgba(15,23,42,0.95),
+    0 0 32px rgba(56,189,248,0.4);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(148,163,184,0.25);
   animation: scaleIn 0.3s ease-out;
 }
 
@@ -33,11 +38,11 @@
 
 .pipeline-header {
   padding: 20px;
-  background-color: #34495e;
+  background-color: rgba(15,23,42,0.9);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(148,163,184,0.25);
 }
 
 .header-left {
@@ -48,18 +53,18 @@
 
 .back-button {
   background-color: transparent;
-  border: 1px solid #7f8c8d;
-  color: #ecf0f1;
+  border: 1px solid rgba(148,163,184,0.5);
+  color: #e2e8f0;
   padding: 6px 12px;
-  border-radius: 4px;
+  border-radius: 999px;
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s ease;
 }
 
 .back-button:hover {
-  background-color: rgba(255,255,255,0.1);
-  border-color: #bdc3c7;
+  background-color: rgba(56,189,248,0.08);
+  border-color: #38bdf8;
 }
 
 .pipeline-header h2 {
@@ -78,13 +83,14 @@
 }
 
 .close-button:hover {
-  color: #e74c3c;
+  color: #f97316;
 }
 
 .pipeline-content {
   flex: 1;
   padding: 40px;
   overflow-y: auto;
+  background: radial-gradient(circle at 0% 0%, rgba(56,189,248,0.08), transparent 55%);
 }
 
 .folders-grid {
@@ -95,22 +101,24 @@
 }
 
 .folder-card {
-  background-color: #34495e;
-  border-radius: 8px;
+  background-color: rgba(15,23,42,0.75);
+  border-radius: 20px;
   padding: 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 1px solid transparent;
+  border: 1px solid rgba(148,163,184,0.2);
 }
 
 .folder-card:hover {
   transform: translateY(-5px);
-  background-color: #3d566e;
-  border-color: #3498db;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  background-color: rgba(15,23,42,0.95);
+  border-color: #38bdf8;
+  box-shadow:
+    0 20px 40px rgba(0,0,0,0.6),
+    0 0 24px rgba(56,189,248,0.4);
 }
 
 .folder-icon {
@@ -125,7 +133,7 @@
   position: absolute;
   bottom: -5px;
   right: -10px;
-  background-color: #27ae60;
+  background-color: #22c55e;
   border: none;
   border-radius: 50%;
   width: 32px;
@@ -147,7 +155,7 @@
 }
 
 .download-icon-btn:hover {
-  background-color: #2ecc71;
+  background-color: #4ade80;
   transform: scale(1.1) !important;
 }
 
@@ -155,7 +163,7 @@
   position: absolute;
   top: -5px;
   right: -15px;
-  background-color: #e74c3c;
+  background-color: #f97316;
   color: white;
   font-size: 10px;
   font-weight: bold;
@@ -205,7 +213,7 @@
 }
 
 .instruction code {
-  background: #1a1a1a;
+  background: #020617;
   padding: 5px 10px;
   border-radius: 4px;
   color: #e67e22;
