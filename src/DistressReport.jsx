@@ -3,66 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { generateDistressReport } from "./ApiService";
 
-const CSV_HEADERS = [
-  "Date_Period",
-  "Depth_mm",
-  "Distress",
-  "Length_m",
-  "Width_m",
-  "latitude",
-  "longitude",
-  "chainage_start",
-  "chainage_end",
-  "Direction",
-  "Lane",
-];
-
-function normalizeKey(key) {
-  return String(key).toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function jsonToCsv(rows) {
-  const headerLine = CSV_HEADERS.join(",");
-  const bodyLines = (Array.isArray(rows) ? rows : []).map((item) =>
-    CSV_HEADERS.map((key) => {
-      if (!item || typeof item !== "object") return '""';
-      const normalizedMap = {};
-      Object.entries(item).forEach(([k, v]) => {
-        const n = normalizeKey(k);
-        if (n && normalizedMap[n] === undefined) {
-          normalizedMap[n] = v;
-        }
-      });
-      const lookupKey = normalizeKey(key);
-      let raw = normalizedMap[lookupKey];
-      if (raw == null) {
-        const candidateKey =
-          Object.keys(normalizedMap).find(
-            (nk) =>
-              nk === lookupKey ||
-              nk.startsWith(lookupKey) ||
-              lookupKey.startsWith(nk) ||
-              nk.includes(lookupKey) ||
-              lookupKey.includes(nk)
-          ) || null;
-        if (candidateKey) {
-          raw = normalizedMap[candidateKey];
-        }
-      }
-      if (raw == null) raw = "";
-      const str = String(raw).replace(/"/g, '""');
-      return `"${str}"`;
-    }).join(",")
-  );
-  return [headerLine, ...bodyLines].join("\r\n");
-}
+// Removing old JSON to CSV conversion as API now returns files directly
 
 export default function DistressReport() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [projectName, setProjectName] = useState("");
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [csvContent, setCsvContent] = useState("");
+  const [csvBlob, setCsvBlob] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
@@ -86,38 +35,27 @@ export default function DistressReport() {
     setErrorMessage("");
     setCsvContent("");
 
-    if (!startDate || !endDate || !file) {
-      setErrorMessage("Start date, end date, and KML file are required.");
+    if (!startDate || !endDate || !file || !projectName) {
+      setErrorMessage("Start date, end date, project name, and KML file are required.");
       return;
     }
 
     try {
       setLoading(true);
-      const data = await generateDistressReport({
+      const { blob, filename } = await generateDistressReport({
         file,
         startDate,
         endDate,
+        projectName,
       });
-      let rows = [];
-      if (Array.isArray(data)) {
-        rows = data;
-      } else if (data && Array.isArray(data.data)) {
-        rows = data.data;
-      } else if (data && Array.isArray(data.results)) {
-        rows = data.results;
-      } else if (data && typeof data === "object") {
-        rows = [data];
-      }
 
-      if (!rows.length) {
+      if (!blob) {
         setErrorMessage("No data returned for the selected period.");
         return;
       }
 
-      const csv = jsonToCsv(rows);
-
-      setCsvContent(csv);
-      setSuccessMessage("Report generated successfully. You can now download the CSV file.");
+      setCsvBlob(blob);
+      setSuccessMessage("Report generated successfully. You can now download the file.");
     } catch (err) {
       let detail = null;
       if (err && err.response && err.response.data) {
@@ -139,12 +77,13 @@ export default function DistressReport() {
   };
 
   const handleDownload = () => {
-    if (!csvContent) return;
+    if (!csvBlob) return;
     const safeStart = startDate || "start";
     const safeEnd = endDate || "end";
-    const filename = `distress_report_${safeStart}_${safeEnd}.csv`;
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = window.URL.createObjectURL(blob);
+    const mime = csvBlob.type || "";
+    const ext = mime.includes("spreadsheetml") || mime.includes("excel") ? "xlsx" : "csv";
+    const filename = `distress_report_${safeStart}_${safeEnd}.${ext}`;
+    const url = window.URL.createObjectURL(csvBlob);
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", filename);
@@ -198,40 +137,53 @@ export default function DistressReport() {
                   <label className="text-xs font-medium uppercase tracking-wide text-slate-300">
                     Start Date
                   </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  onClick={(e) => {
-                    try {
-                      if (typeof e.target.showPicker === "function") {
-                        e.target.showPicker();
-                      }
-                    } catch (_) {}
-                  }}
-                  className="distress-date-input rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none ring-0 transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40"
-                  required
-                />
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    onClick={(e) => {
+                      try {
+                        if (typeof e.target.showPicker === "function") {
+                          e.target.showPicker();
+                        }
+                      } catch (_) { }
+                    }}
+                    className="distress-date-input rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none ring-0 transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40"
+                    required
+                  />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium uppercase tracking-wide text-slate-300">
                     End Date
                   </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    onClick={(e) => {
+                      try {
+                        if (typeof e.target.showPicker === "function") {
+                          e.target.showPicker();
+                        }
+                      } catch (_) { }
+                    }}
+                    className="distress-date-input rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none ring-0 transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-slate-300">
+                  Project Name
+                </label>
                 <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  onClick={(e) => {
-                    try {
-                      if (typeof e.target.showPicker === "function") {
-                        e.target.showPicker();
-                      }
-                    } catch (_) {}
-                  }}
-                  className="distress-date-input rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none ring-0 transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40"
+                  type="text"
+                  placeholder="Enter project name"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none ring-0 transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40"
                   required
                 />
-                </div>
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium uppercase tracking-wide text-slate-300">
@@ -275,10 +227,10 @@ export default function DistressReport() {
                 <button
                   type="button"
                   onClick={handleDownload}
-                  disabled={!csvContent || loading}
+                  disabled={!csvBlob || loading}
                   className="inline-flex items-center justify-center rounded-full border border-slate-600/80 px-5 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400 hover:text-emerald-300 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
                 >
-                  Download CSV
+                  Download Report
                 </button>
               </div>
             </form>

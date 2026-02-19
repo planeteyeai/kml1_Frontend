@@ -6,6 +6,7 @@ import { generateDistressPredicted } from "./ApiService";
 export default function DistressPredicted() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [projectName, setProjectName] = useState("");
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [csvBlob, setCsvBlob] = useState(null);
@@ -32,8 +33,8 @@ export default function DistressPredicted() {
     setErrorMessage("");
     setCsvBlob(null);
 
-    if (!startDate || !endDate || !file) {
-      setErrorMessage("Start date, end date, and KML file are required.");
+    if (!startDate || !endDate || !file || !projectName) {
+      setErrorMessage("Start date, end date, project name, and KML file are required.");
       return;
     }
 
@@ -43,6 +44,7 @@ export default function DistressPredicted() {
         file,
         startDate,
         endDate,
+        projectName,
       });
       if (!blob) {
         setErrorMessage("No data returned for the selected period.");
@@ -62,7 +64,7 @@ export default function DistressPredicted() {
           try {
             const text = await data.text();
             if (text) detail = text;
-          } catch (_) {}
+          } catch (_) { }
         } else if (typeof data === "string") {
           detail = data;
         } else if (Array.isArray(data.detail)) {
@@ -90,7 +92,7 @@ export default function DistressPredicted() {
 
       setErrorMessage(
         detail ||
-          "Failed to generate predicted distress. Please check your input and try again."
+        "Failed to generate predicted distress. Please check your input and try again."
       );
     } finally {
       setLoading(false);
@@ -169,7 +171,7 @@ export default function DistressPredicted() {
                         if (typeof e.target.showPicker === "function") {
                           e.target.showPicker();
                         }
-                      } catch (_) {}
+                      } catch (_) { }
                     }}
                     className="distress-date-input rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none ring-0 transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40"
                     required
@@ -188,12 +190,25 @@ export default function DistressPredicted() {
                         if (typeof e.target.showPicker === "function") {
                           e.target.showPicker();
                         }
-                      } catch (_) {}
+                      } catch (_) { }
                     }}
                     className="distress-date-input rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none ring-0 transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40"
                     required
                   />
                 </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-slate-300">
+                  Project Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter project name"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none ring-0 transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40"
+                  required
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium uppercase tracking-wide text-slate-300">

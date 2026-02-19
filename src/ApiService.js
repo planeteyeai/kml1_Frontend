@@ -14,8 +14,24 @@ export async function generateDistressReport({ file, startDate, endDate, project
   const query = params.toString();
   const url = `${API_URL}/api/distress-report${query ? `?${query}` : ""}`;
 
-  const response = await axios.post(url, formData);
-  return response.data;
+  const response = await axios.post(url, formData, {
+    responseType: "blob",
+  });
+  let filename = "distress_report.xlsx";
+  const cd =
+    (response.headers && response.headers["content-disposition"]) ||
+    (response.headers && response.headers.get && response.headers.get("content-disposition"));
+  if (cd && typeof cd === "string") {
+    const match = cd.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
+    if (match && match[1]) {
+      try {
+        filename = decodeURIComponent(match[1].replace(/\"/g, "").trim());
+      } catch (_) {
+        filename = match[1].replace(/\"/g, "").trim();
+      }
+    }
+  }
+  return { blob: response.data, filename };
 }
 
 export async function getDistressPredictedJson({ startDate, endDate, projectName }) {
