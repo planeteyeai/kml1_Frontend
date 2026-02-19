@@ -33,7 +33,7 @@ export default function DistressReport() {
     e.preventDefault();
     setSuccessMessage("");
     setErrorMessage("");
-    setCsvContent("");
+    setCsvBlob(null);
 
     if (!startDate || !endDate || !file || !projectName) {
       setErrorMessage("Start date, end date, project name, and KML file are required.");
