@@ -31,7 +31,7 @@
     "test": "node node_modules/react-scripts/bin/react-scripts.js test",
     "eject": "node node_modules/react-scripts/bin/react-scripts.js eject"
   },
-  "proxy": "https://kml-backend-production.up.railway.app",
+  "proxy": "https://kml-backend-production-501c.up.railway.app",
   "eslintConfig": {
     "extends": [
       "react-app",
