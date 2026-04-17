@@ -63,6 +63,26 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
     return diffInMinutes < 5; // Consider "New" if modified in the last 5 minutes
   };
 
+  const isMergeKmlFolder = () => {
+    const normalizedPath = (currentPath || '').replace(/\\/g, '/').replace(/\/+$/, '');
+    const folderName = normalizedPath.split('/').pop() || '';
+    return /^(LHS|RHS)_kml_merge(_images)?$/i.test(folderName);
+  };
+
+  const isMergeImagesFolder = () => {
+    const normalizedPath = (currentPath || '').replace(/\\/g, '/').replace(/\/+$/, '');
+    const folderName = normalizedPath.split('/').pop() || '';
+    return /^(LHS|RHS)_kml_merge_images$/i.test(folderName);
+  };
+
+  const shouldShowDistressButton = (item) => {
+    if (!item || item.type === 'folder') return false;
+    const normalizedPath = (currentPath || '').replace(/\\/g, '/').toLowerCase();
+    const name = (item.name || '').toLowerCase();
+    if (normalizedPath.includes('kml_merge')) return true;
+    return /_merged\.(png|kml)$/i.test(name);
+  };
+
   const handleDownloadClick = (e, item) => {
     e.stopPropagation(); // Prevent folder opening
     if (item.type === 'folder') {
@@ -70,6 +90,11 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
     } else {
       window.open(`${API_URL}/pipeline-files/${item.path}?token=${token}`, '_blank');
     }
+  };
+
+  const handleDistressIdentifyClick = (e, item) => {
+    if (e) e.stopPropagation();
+    window.open('https://distress-prediction.onrender.com/', '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -80,6 +105,15 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
              {currentPath && (
               <button className="back-button" onClick={handleBackClick}>
                 ← Back
+              </button>
+            )}
+            {currentPath && (
+              <button
+                className="back-button distress-header-button"
+                onClick={handleDistressIdentifyClick}
+                title="Open distress identify portal"
+              >
+                Distress Identify
               </button>
             )}
             <h2>{currentPath ? currentPath.split('/').pop() : 'Project Pipeline'}</h2>

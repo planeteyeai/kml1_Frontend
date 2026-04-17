@@ -12,6 +12,8 @@ COPY . .
 # Set environment variables for production build
 ENV CI=false
 ENV NODE_OPTIONS=--max-old-space-size=4096
+ARG REACT_APP_API_URL=http://localhost:3001
+ENV REACT_APP_API_URL=${REACT_APP_API_URL}
 
 RUN npm run build
 

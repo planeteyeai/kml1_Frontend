@@ -29,6 +29,7 @@
   overflow: hidden;
   border: 1px solid rgba(148,163,184,0.25);
   animation: scaleIn 0.3s ease-out;
+  position: relative;
 }
 
 @keyframes scaleIn {
@@ -65,6 +66,12 @@
 .back-button:hover {
   background-color: rgba(56,189,248,0.08);
   border-color: #38bdf8;
+}
+
+.distress-header-button {
+  border-color: rgba(56, 189, 248, 0.8);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(99, 102, 241, 0.2));
+  font-weight: 600;
 }
 
 .pipeline-header h2 {
@@ -186,6 +193,26 @@
   color: #bdc3c7;
   opacity: 0.7;
 }
+
+.distress-identify-btn {
+  margin-top: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.65);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(99, 102, 241, 0.22));
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.distress-identify-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(56, 189, 248, 0.9);
+  box-shadow: 0 8px 18px rgba(56, 189, 248, 0.3);
+}
+
 
 .sort-hint {
   font-size: 12px;
