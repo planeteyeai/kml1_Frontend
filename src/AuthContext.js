@@ -14,8 +14,8 @@ function generateDeviceId() {
 }
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
+  const [user, setUser] = useState({ username: "local-user" });
+  const [token, setToken] = useState("");
   const [deviceId, setDeviceId] = useState(null);
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -28,21 +28,14 @@ export const AuthProvider = ({ children }) => {
       stored = {};
     }
 
-    let {
-      token: savedToken,
-      username: savedUsername,
-      deviceId: savedDeviceId,
-      remember: savedRemember,
-    } = stored;
+    let { username: savedUsername, deviceId: savedDeviceId } = stored;
 
     if (!savedDeviceId) {
       savedDeviceId = generateDeviceId();
     }
 
-    if (savedRemember && savedToken && savedUsername) {
-      setToken(savedToken);
-      setUser({ username: savedUsername });
-    }
+    setToken("");
+    setUser({ username: savedUsername || "local-user" });
 
     setDeviceId(savedDeviceId);
     setRemember(!!savedRemember);
@@ -50,39 +43,41 @@ export const AuthProvider = ({ children }) => {
     const nextStored = {
       ...stored,
       deviceId: savedDeviceId,
-      remember: !!savedRemember,
+      remember: true,
+      username: savedUsername || "local-user",
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStored));
     setLoading(false);
   }, []);
 
-  const login = (userData, userToken, shouldRemember) => {
+  const login = (userData) => {
     const ensuredDeviceId = deviceId || generateDeviceId();
-    setUser(userData);
-    setToken(userToken);
+    const resolvedUsername =
+      (userData && userData.username && String(userData.username).trim()) ||
+      "local-user";
+    setUser({ username: resolvedUsername });
+    setToken("");
     setDeviceId(ensuredDeviceId);
-    setRemember(!!shouldRemember);
+    setRemember(true);
 
     const stored = {
       deviceId: ensuredDeviceId,
-      remember: !!shouldRemember,
+      remember: true,
+      username: resolvedUsername,
     };
-
-    if (shouldRemember) {
-      stored.username = userData.username;
-      stored.token = userToken;
-    }
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
   };
 
   const logout = () => {
-    setUser(null);
-    setToken(null);
-    setRemember(false);
+    // Keep no-login flow active; reset to a default local user.
+    setUser({ username: "local-user" });
+    setToken("");
+    setRemember(true);
     const stored = {
       deviceId: deviceId || generateDeviceId(),
-      remember: false,
+      remember: true,
+      username: "local-user",
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
   };
