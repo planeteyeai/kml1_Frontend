@@ -95,7 +95,7 @@ const SearchControl = ({ visible }) => {
   return null;
 };
 
-const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffset, onSaveSuccess, initialGeoJson }, ref) => {
+const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffset, startDate, endDate, imageDirection, onSaveSuccess, initialGeoJson }, ref) => {
   const { token } = useAuth();
   const position = [18.5204, 73.8567]; // Pune center
   const [geoJsonData, setGeoJsonData] = useState(null);
@@ -138,6 +138,9 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
       formData.append('offsetType', offsetType);
       formData.append('laneCount', laneCount);
       formData.append('kmlMergeOffset', kmlMergeOffset);
+      formData.append('startDate', startDate || '');
+      formData.append('endDate', endDate || '');
+      formData.append('imageDirection', imageDirection || 'down_to_up');
 
       fetch(`${API_URL}/upload-kml`, {
         method: 'POST',
@@ -241,7 +244,10 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
         chainage,
         offsetType,
         laneCount,
-        kmlMergeOffset
+        kmlMergeOffset,
+        startDate,
+        endDate,
+        imageDirection
       },
       geometry: allFeatures
     };

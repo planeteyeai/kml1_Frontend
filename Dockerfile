@@ -29,5 +29,5 @@ COPY --from=build /app/build ./build
 ENV PORT=8080
 EXPOSE 8080
 
-# Start 'serve' on the specified port
-CMD ["serve", "-s", "build", "-l", "8080"]
+# Start serve on Railway-provided PORT (fallback 8080)
+CMD ["sh", "-c", "serve -s build -l ${PORT:-8080}"]

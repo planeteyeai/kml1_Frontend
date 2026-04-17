@@ -13,7 +13,7 @@
   flex-direction: column;
   position: relative;
   isolation: isolate;
-  padding-bottom: 20px;
+  padding-bottom: 0;
 }
 
 .app-header {
@@ -30,7 +30,9 @@
     0 0 26px rgba(56, 189, 248, 0.35);
   position: sticky;
   top: 0;
-  z-index: 50;
+  /* Leaflet panes/controls use z-index in the hundreds; keep header above while scrolling */
+  z-index: 10000;
+  flex-shrink: 0;
 }
 
 .app-header-left {
@@ -137,17 +139,26 @@
 .main-content {
   display: flex;
   width: 95%;
-  margin: 20px auto;
-  gap: 20px;
-  height: 85vh;
+  margin: 6px auto;
+  gap: 14px;
+  /* Header + vertical margins — keep full layout on one screen */
+  height: calc(100vh - 72px);
+  max-height: calc(100vh - 72px);
   max-width: 1200px;
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  box-sizing: border-box;
 }
 
 .map-section {
   flex: 3;
+  min-width: 0;
+  min-height: 0;
   border-radius: 20px;
   overflow: hidden;
   position: relative;
+  z-index: 0;
   background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(56, 189, 248, 0.35);
   box-shadow:
@@ -161,6 +172,114 @@
   flex-direction: column;
   gap: 15px;
   height: 100%;
+}
+
+/* KML main screen: compact sidebar, no internal scroll */
+.cards-section--kml {
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  justify-content: flex-start;
+}
+
+.cards-section--kml > .card--compact {
+  padding: 7px 9px;
+  border-radius: 12px;
+  box-shadow:
+    0 6px 16px rgba(15, 23, 42, 0.75),
+    0 0 12px rgba(56, 189, 248, 0.12);
+}
+
+.cards-section--kml > .card--compact:hover {
+  transform: none;
+  border-color: rgba(148, 163, 184, 0.25);
+  box-shadow:
+    0 8px 18px rgba(15, 23, 42, 0.85),
+    0 0 14px rgba(56, 189, 248, 0.18);
+}
+
+.kml-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.cards-section--kml .input-group {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+}
+
+.cards-section--kml .input-group label {
+  flex: none;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.cards-section--kml .input-group--full {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.cards-section--kml .input-group--full label {
+  flex: 0 0 38%;
+  font-size: 0.72rem;
+}
+
+.cards-section--kml .sidebar-input {
+  padding: 5px 8px;
+  font-size: 0.78rem;
+  border-radius: 8px;
+}
+
+.cards-section--kml .save-button {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+.cards-section--kml .clear-button {
+  margin-top: 5px;
+  width: 100%;
+  padding: 6px 10px;
+  background-color: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.cards-section--kml .kml-pipeline-link-wrap {
+  margin-top: 6px;
+  text-align: center;
+}
+
+.cards-section--kml .one-link {
+  font-size: 0.75rem;
+}
+
+.cards-section--kml .saved-notification {
+  padding: 6px 8px !important;
+}
+
+.cards-section--kml .notification-content {
+  margin-bottom: 4px;
+  gap: 6px;
+}
+
+.cards-section--kml .success-icon {
+  width: 20px;
+  height: 20px;
+  font-size: 14px;
+}
+
+.cards-section--kml .view-pipeline-btn {
+  padding: 4px 10px;
+  font-size: 11px;
 }
 
 .card {
@@ -505,7 +624,7 @@
 
 .landing-card-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
 }
 
@@ -571,6 +690,25 @@
 
 .landing-card-logo-Predicted::before {
   background: radial-gradient(circle, rgba(192, 132, 252, 0.55) 0%, transparent 70%);
+}
+
+.landing-card-logo-inventory::before {
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.55) 0%, transparent 70%);
+}
+
+.kml-selection-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  width: 100%;
+}
+
+.kml-selection-grid > .landing-card:nth-child(1) {
+  animation: cardFloat 3.2s ease-in-out infinite;
+  border-color: rgba(56, 189, 248, 0.9);
+  background:
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.25), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.6), rgba(15, 23, 42, 0.95));
 }
 
 .landing-card::before {
@@ -722,6 +860,15 @@
     radial-gradient(circle at bottom right, rgba(126, 34, 206, 0.9), rgba(15, 23, 42, 0.96));
 }
 
+.landing-card-grid > .landing-card:nth-child(4) {
+  animation: cardFloat 4.1s ease-in-out infinite;
+  animation-delay: 0.24s;
+  border-color: rgba(34, 197, 94, 0.85);
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.4), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.9), rgba(15, 23, 42, 0.96));
+}
+
 @keyframes landingFadeIn {
   from {
     opacity: 0;
@@ -747,6 +894,10 @@
 
 @media (max-width: 900px) {
   .landing-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kml-selection-grid {
     grid-template-columns: 1fr;
   }
 

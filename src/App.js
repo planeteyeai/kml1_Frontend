@@ -8,6 +8,10 @@ import { useAuth } from "./AuthContext";
 import API_URL from "./config";
 import DistressReport from "./DistressReport";
 import DistressPredicted from "./DistressPredicted";
+import InventoryCard from "./InventoryCard";
+import KMLSelection from "./KMLSelection";
+import KML1Form from "./KML1Form";
+import KML2Form from "./KML2Form";
 import {
   BrowserRouter as Router,
   Routes,
@@ -24,6 +28,9 @@ function MainKmlApp() {
   const [offsetType, setOffsetType] = useState('');
   const [laneCount, setLaneCount] = useState('2');
   const [kmlMergeOffset, setKmlMergeOffset] = useState('');
+  const [startDate, setStartDate] = useState('2026-02-10');
+  const [endDate, setEndDate] = useState('2026-02-20');
+  const [imageDirection, setImageDirection] = useState('down_to_up');
   const [showPipeline, setShowPipeline] = useState(false);
   const [lastSavedPath, setLastSavedPath] = useState('');
   const [pipelineInitialPath, setPipelineInitialPath] = useState('');
@@ -48,6 +55,9 @@ function MainKmlApp() {
             setOffsetType(lastEntry.metadata.offsetType || '');
             setLaneCount(lastEntry.metadata.laneCount || '2');
             setKmlMergeOffset(lastEntry.metadata.kmlMergeOffset || '');
+            setStartDate(lastEntry.metadata.startDate || '2026-02-10');
+            setEndDate(lastEntry.metadata.endDate || '2026-02-20');
+            setImageDirection(lastEntry.metadata.imageDirection || 'down_to_up');
           }
           if (lastEntry.geometry) {
             setInitialGeoJson({
@@ -161,6 +171,7 @@ function MainKmlApp() {
                   <span className="landing-card-cta secondary">Get Started</span>
                 </div>
               </button>
+              <InventoryCard onGetStarted={() => navigate("/inventory/kml-1")} />
             </div>
           </div>
         </div>
@@ -185,6 +196,9 @@ function MainKmlApp() {
     setOffsetType('');
     setLaneCount('2');
     setKmlMergeOffset('');
+    setStartDate('2026-02-10');
+    setEndDate('2026-02-20');
+    setImageDirection('down_to_up');
     setInitialGeoJson(null);
     setLastSavedPath('');
     if (mapRef.current) {
@@ -222,13 +236,16 @@ function MainKmlApp() {
             offsetType={offsetType}
             laneCount={laneCount}
             kmlMergeOffset={kmlMergeOffset}
+            startDate={startDate}
+            endDate={endDate}
+            imageDirection={imageDirection}
             onSaveSuccess={handleSaveSuccess}
             initialGeoJson={initialGeoJson}
           />
         </div>
-        <div className="cards-section">
+        <div className="cards-section cards-section--kml">
           {lastSavedPath && (
-            <div className="card saved-notification">
+            <div className="card card--compact saved-notification">
               <div className="notification-content">
                 <span className="success-icon">✓</span>
                 <div className="notification-text">
@@ -244,61 +261,99 @@ function MainKmlApp() {
               </button>
             </div>
           )}
-          <div className="card">
-            <div className="input-group">
-              <label htmlFor="chainage-input">Chainage(km)</label>
-              <input 
-                id="chainage-input" 
-                type="text" 
-                placeholder="Enter Chainage" 
-                className="sidebar-input"
-                value={chainage}
-                onChange={(e) => setChainage(e.target.value)}
-              />
+          <div className="card card--compact">
+            <div className="kml-form-grid">
+              <div className="input-group">
+                <label htmlFor="chainage-input">Chainage(km)</label>
+                <input 
+                  id="chainage-input" 
+                  type="text" 
+                  placeholder="Enter Chainage" 
+                  className="sidebar-input"
+                  value={chainage}
+                  onChange={(e) => setChainage(e.target.value)}
+                />
+              </div>
+              <div className="input-group">
+                <label htmlFor="offset-input">Offset Type(m)</label>
+                <input 
+                  id="offset-input" 
+                  type="text" 
+                  placeholder="Enter Offset Type" 
+                  className="sidebar-input"
+                  value={offsetType}
+                  onChange={(e) => setOffsetType(e.target.value)}
+                />
+              </div>
             </div>
           </div>
-          <div className="card">
-            <div className="input-group">
-              <label htmlFor="offset-input">Offset Type(m)</label>
-              <input 
-                id="offset-input" 
-                type="text" 
-                placeholder="Enter Offset Type" 
-                className="sidebar-input"
-                value={offsetType}
-                onChange={(e) => setOffsetType(e.target.value)}
-              />
+          <div className="card card--compact">
+            <div className="kml-form-grid">
+              <div className="input-group">
+                <label htmlFor="lane-count-select">Lane</label>
+                <select 
+                  id="lane-count-select" 
+                  className="sidebar-input"
+                  value={laneCount}
+                  onChange={(e) => setLaneCount(e.target.value)}
+                >
+                  <option value="2">2</option>
+                  <option value="4">4</option>
+                  <option value="6">6</option>
+                </select>
+              </div>
+              <div className="input-group">
+                <label htmlFor="kml-merge-offset">KML(km)</label>
+                <input 
+                  id="kml-merge-offset" 
+                  type="text" 
+                  placeholder="Enter KML Merge Offset" 
+                  className="sidebar-input"
+                  value={kmlMergeOffset}
+                  onChange={(e) => setKmlMergeOffset(e.target.value)}
+                />
+              </div>
             </div>
           </div>
-          <div className="card">
-            <div className="input-group">
-              <label htmlFor="lane-count-select">Lane</label>
-              <select 
-                id="lane-count-select" 
+          <div className="card card--compact">
+            <div className="kml-form-grid">
+              <div className="input-group">
+                <label htmlFor="start-date-input">Start Date</label>
+                <input
+                  id="start-date-input"
+                  type="date"
+                  className="sidebar-input distress-date-input"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="input-group">
+                <label htmlFor="end-date-input">End Date</label>
+                <input
+                  id="end-date-input"
+                  type="date"
+                  className="sidebar-input distress-date-input"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="card card--compact">
+            <div className="input-group input-group--full">
+              <label htmlFor="image-direction-select">Direction</label>
+              <select
+                id="image-direction-select"
                 className="sidebar-input"
-                value={laneCount}
-                onChange={(e) => setLaneCount(e.target.value)}
+                value={imageDirection}
+                onChange={(e) => setImageDirection(e.target.value)}
               >
-                <option value="2">2</option>
-                <option value="4">4</option>
-                <option value="6">6</option>
+                <option value="down_to_up">South To North</option>
+                <option value="up_to_down">North To South</option>
               </select>
             </div>
           </div>
-          <div className="card">
-            <div className="input-group">
-              <label htmlFor="kml-merge-offset">KML(km)</label>
-              <input 
-                id="kml-merge-offset" 
-                type="text" 
-                placeholder="Enter KML Merge Offset" 
-                className="sidebar-input"
-                value={kmlMergeOffset}
-                onChange={(e) => setKmlMergeOffset(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="card">
+          <div className="card card--compact card--actions">
             <button 
               className="save-button"
               onClick={handleTriggerSave}
@@ -306,24 +361,13 @@ function MainKmlApp() {
               Save Data
             </button>
             <button 
+              type="button"
               className="clear-button"
               onClick={handleReset}
-              style={{ 
-                marginTop: '8px', 
-                width: '100%', 
-                padding: '9px 12px', 
-                backgroundColor: '#e74c3c', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '999px', 
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '0.9rem'
-              }}
             >
               Clear All Data
             </button>
-            <div style={{ marginTop: '15px', textAlign: 'center' }}>
+            <div className="kml-pipeline-link-wrap">
               <button
                 type="button"
                 className="one-link"
@@ -354,6 +398,9 @@ function App() {
       <Routes>
         <Route path="/distress-report" element={<DistressReport />} />
         <Route path="/distress-predicted" element={<DistressPredicted />} />
+        <Route path="/inventory" element={<KMLSelection />} />
+        <Route path="/inventory/kml-1" element={<KML1Form />} />
+        <Route path="/inventory/kml-2" element={<KML2Form />} />
         <Route path="/*" element={<MainKmlApp />} />
       </Routes>
     </Router>

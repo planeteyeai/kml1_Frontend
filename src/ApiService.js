@@ -97,28 +97,26 @@ export async function downloadDetectPredictedDistressCombined({
   endDate,
   projectName,
 }) {
-  const params = new URLSearchParams();
-  if (startDate) params.set("start_date", startDate);
-  if (endDate) params.set("end_date", endDate);
-  if (projectName) params.set("project_name", projectName);
-
   const formData = new FormData();
+  if (startDate) formData.append("start_date", startDate);
+  if (endDate) formData.append("end_date", endDate);
+  if (projectName) formData.append("project_name", projectName);
   if (file) {
     try {
       const kmlFile = new File([file], file.name, {
         type: "application/vnd.google-earth.kml+xml",
       });
-      formData.append("file", kmlFile);
+      formData.append("kml", kmlFile);
     } catch (_) {
-      formData.append("file", file);
+      formData.append("kml", file);
     }
   }
-  const url = `https://distress-kml.up.railway.app/detect-distress-final_predicted/?${params.toString()}`;
+  const url = `https://distress-kml.up.railway.app/detect-distress-final_predicted/`;
   const response = await axios.post(url, formData, {
     responseType: "blob",
     headers: {
       Accept:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/json, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     },
   });
   let filename = "distress_predicted.xlsx";
@@ -316,10 +314,12 @@ export async function generateDistressFinalPredictedProxy({
   if (startDate) params.set("start_date", startDate);
   if (endDate) params.set("end_date", endDate);
   if (projectName) params.set("project_name", projectName);
-
   const formData = new FormData();
+  if (startDate) formData.append("start_date", startDate);
+  if (endDate) formData.append("end_date", endDate);
+  if (projectName) formData.append("project_name", projectName);
   if (file) formData.append("file", file);
-  const url = `${API_URL}/api/distress-final-predicted?${params.toString()}`;
+  const url = `${API_URL}/api/distress-final-predicted${params.toString() ? `?${params.toString()}` : ""}`;
   const response = await axios.post(url, formData, {
     responseType: "blob",
     headers: {

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
-import { generateDistressPredicted } from "./ApiService";
+import { downloadDetectPredictedDistressCombined, generateDistressFinalPredictedProxy } from "./ApiService";
 
 export default function DistressPredicted() {
   const [startDate, setStartDate] = useState("");
@@ -33,28 +33,35 @@ export default function DistressPredicted() {
     setErrorMessage("");
     setCsvBlob(null);
 
-    if (!startDate || !endDate || !file || !projectName) {
-      setErrorMessage("Start date, end date, project name, and KML file are required.");
+    if (!startDate || !endDate || !file) {
+      setErrorMessage("Start date, end date, and KML file are required.");
       return;
     }
 
     try {
       setLoading(true);
-      const blob = await generateDistressPredicted({
-        file,
-        startDate,
-        endDate,
-        projectName,
-      });
-      if (!blob) {
+      let result;
+      try {
+        result = await downloadDetectPredictedDistressCombined({
+          file,
+          startDate,
+          endDate,
+          projectName,
+        });
+      } catch (_) {
+        result = await generateDistressFinalPredictedProxy({
+          file,
+          startDate,
+          endDate,
+          projectName,
+        });
+      }
+      if (!result || !result.blob) {
         setErrorMessage("No data returned for the selected period.");
         return;
       }
-
-      setCsvBlob(blob);
-      setSuccessMessage(
-        "Predicted distress generated successfully. You can now download the CSV file."
-      );
+      setCsvBlob(result.blob);
+      setSuccessMessage("Predicted distress generated successfully. You can now download the Excel file.");
     } catch (err) {
       let detail = null;
       const status = err && err.response && err.response.status;

@@ -19,7 +19,14 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          setItems(data.items);
+          const mergeLast = (it) => /_kml_merge$/i.test(it.name);
+          const sorted = [...data.items].sort((a, b) => {
+            if (mergeLast(a) !== mergeLast(b)) return mergeLast(a) ? 1 : -1;
+            if (a.type === 'folder' && b.type !== 'folder') return -1;
+            if (a.type !== 'folder' && b.type === 'folder') return 1;
+            return new Date(b.modifiedAt) - new Date(a.modifiedAt);
+          });
+          setItems(sorted);
           setCurrentPath(data.currentPath);
         }
         setLoading(false);
