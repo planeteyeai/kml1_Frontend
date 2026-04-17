@@ -28,6 +28,8 @@
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
+    <!-- Loaded before the bundle; Docker CMD can overwrite this file with the real API URL at runtime -->
+    <script src="%PUBLIC_URL%/runtime-config.js"></script>
     <div id="root"></div>
     <!--
       This HTML file is a template.

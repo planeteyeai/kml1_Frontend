@@ -31,7 +31,9 @@ RUN npm install -g serve
 COPY --from=build /app/build ./build
 
 ENV PORT=8080
+# Runtime API base (matches HOSTED_KML_API_BASE / src/config.js). Override on Railway if the backend URL changes.
+ENV KML_BACKEND_URL=https://kml-backend-production-501c.up.railway.app
 EXPOSE 8080
 
-# Start serve on Railway-provided PORT (fallback 8080)
-CMD ["sh", "-c", "serve -s build -l ${PORT:-8080}"]
+# Inject API URL into runtime-config.js on each start, then serve static files
+CMD ["sh", "-c", "echo \"window.__KML_API_URL__='${KML_BACKEND_URL:-https://kml-backend-production-501c.up.railway.app}';\" > build/runtime-config.js && exec serve -s build -l ${PORT:-8080}"]

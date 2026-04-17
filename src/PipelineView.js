@@ -9,14 +9,36 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
   const [items, setItems] = useState([]);
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
 
   const fetchItems = useCallback((path = '') => {
     setLoading(true);
-    fetch(`${API_URL}/pipeline-folders?path=${encodeURIComponent(path)}`, {
+    setFetchError("");
+    const base = API_URL || "";
+    const url = `${base}/pipeline-folders?path=${encodeURIComponent(path)}`;
+    fetch(url, {
       headers: apiHeaders(token, user?.username),
     })
-      .then(res => res.json())
-      .then(data => {
+      .then(async (res) => {
+        const text = await res.text();
+        let data;
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          throw new Error(
+            res.ok
+              ? "Invalid response from server."
+              : `Server error (${res.status}). Check API URL and CORS.`
+          );
+        }
+        if (!res.ok) {
+          throw new Error(
+            data.message || data.detail || `Request failed (${res.status})`
+          );
+        }
+        return data;
+      })
+      .then((data) => {
         if (data.success) {
           const mergeLast = (it) => /_kml_merge$/i.test(it.name);
           const sorted = [...data.items].sort((a, b) => {
@@ -27,11 +49,14 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
           });
           setItems(sorted);
           setCurrentPath(data.currentPath);
+        } else {
+          setFetchError(data.message || "Could not load pipeline folder.");
         }
         setLoading(false);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error("Error fetching pipeline items:", err);
+        setFetchError(err.message || "Network error — is the backend reachable?");
         setLoading(false);
       });
   }, [token, user?.username]);
@@ -122,13 +147,27 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
         </div>
         
         <div className="pipeline-content">
-          {loading ? (
+          {fetchError && (
+            <div className="empty-state" style={{ color: "#f87171" }}>
+              <p>{fetchError}</p>
+              {process.env.NODE_ENV === "development" && (
+                <p style={{ fontSize: "0.85rem", opacity: 0.9, marginTop: "0.5rem" }}>
+                  Local dev uses the CRA proxy (requests to this origin). For a local API on another port, set{" "}
+                  <code>REACT_APP_API_URL</code> in <code>.env.local</code> and restart <code>npm start</code>.
+                </p>
+              )}
+            </div>
+          )}
+          {!fetchError && loading ? (
             <div className="loading">Loading...</div>
-          ) : items.length === 0 ? (
+          ) : !fetchError && items.length === 0 ? (
             <div className="empty-state">
               <p>This folder is empty.</p>
+              <p style={{ fontSize: "0.85rem", opacity: 0.75, marginTop: "0.5rem" }}>
+                Save KML data successfully first — pipeline files appear after the server processes your geometry.
+              </p>
             </div>
-          ) : (
+          ) : !fetchError ? (
             <div className="folders-grid">
               {items.map((item, index) => (
                 <div key={index} className="folder-card" onClick={() => handleItemClick(item)}>
@@ -161,7 +200,7 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
