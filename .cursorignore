@@ -1,0 +1,8 @@
+﻿# Dependencies & build output (keeps Cursor / search / file trees small)
+node_modules/
+build/
+dist/
+coverage/
+.cache/
+.parcel-cache/
+*.log
