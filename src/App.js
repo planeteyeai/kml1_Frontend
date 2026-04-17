@@ -6,6 +6,7 @@ import Login from "./Login";
 import Register from "./Register";
 import { useAuth } from "./AuthContext";
 import API_URL from "./config";
+import { apiHeaders } from "./apiHeaders";
 import DistressReport from "./DistressReport";
 import DistressPredicted from "./DistressPredicted";
 import InventoryCard from "./InventoryCard";
@@ -41,12 +42,10 @@ function MainKmlApp() {
 
   // Load last saved data on mount; fallback to local draft when server is unavailable.
   useEffect(() => {
-    if (!token || !user?.username) return;
+    if (!user?.username) return;
 
     fetch(`${API_URL}/data`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers: apiHeaders(token, user.username),
     })
       .then(res => res.json())
       .then(data => {

@@ -12,7 +12,9 @@ COPY . .
 # Set environment variables for production build
 ENV CI=false
 ENV NODE_OPTIONS=--max-old-space-size=4096
-ARG REACT_APP_API_URL=http://localhost:3001
+# Empty = use bundled fallback in src/config.js (hosted Railway backend).
+# Override at build time: docker build --build-arg REACT_APP_API_URL=https://your-api.example.com .
+ARG REACT_APP_API_URL=
 ENV REACT_APP_API_URL=${REACT_APP_API_URL}
 
 RUN npm run build

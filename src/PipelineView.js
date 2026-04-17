@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './PipelineView.css';
 import API_URL from './config';
+import { apiHeaders, usernameQuery } from './apiHeaders';
 import { useAuth } from './AuthContext';
 
 const PipelineView = ({ onClose, initialPath = '' }) => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [items, setItems] = useState([]);
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [loading, setLoading] = useState(true);
@@ -12,9 +13,7 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
   const fetchItems = useCallback((path = '') => {
     setLoading(true);
     fetch(`${API_URL}/pipeline-folders?path=${encodeURIComponent(path)}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers: apiHeaders(token, user?.username),
     })
       .then(res => res.json())
       .then(data => {
@@ -35,7 +34,7 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
         console.error("Error fetching pipeline items:", err);
         setLoading(false);
       });
-  }, [token]);
+  }, [token, user?.username]);
 
   useEffect(() => {
     fetchItems(initialPath);
@@ -47,7 +46,7 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
     } else {
       // It's a file, maybe download or view it?
       // For now, let's open it in a new tab if it's served statically
-      window.open(`${API_URL}/pipeline-files/${item.path}?token=${token}`, '_blank');
+      window.open(`${API_URL}/pipeline-files/${item.path}?${usernameQuery(user?.username)}`, '_blank');
     }
   };
 
@@ -86,9 +85,9 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
   const handleDownloadClick = (e, item) => {
     e.stopPropagation(); // Prevent folder opening
     if (item.type === 'folder') {
-      window.location.href = `${API_URL}/download-folder?path=${encodeURIComponent(item.path)}&token=${token}`;
+      window.location.href = `${API_URL}/download-folder?path=${encodeURIComponent(item.path)}&${usernameQuery(user?.username)}`;
     } else {
-      window.open(`${API_URL}/pipeline-files/${item.path}?token=${token}`, '_blank');
+      window.open(`${API_URL}/pipeline-files/${item.path}?${usernameQuery(user?.username)}`, '_blank');
     }
   };
 

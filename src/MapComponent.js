@@ -9,6 +9,7 @@ import L from 'leaflet';
 import 'leaflet-draw'; // Force load GeometryUtil
 import { kml } from "@tmcw/togeojson";
 import API_URL from './config';
+import { apiHeaders } from './apiHeaders';
 import { useAuth } from './AuthContext';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -153,9 +154,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
 
       fetch(`${API_URL}/upload-kml`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
+        headers: apiHeaders(token, user?.username),
         body: formData,
       })
       .then(response => response.json())
@@ -266,7 +265,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...apiHeaders(token, user?.username),
         },
         body: JSON.stringify(payload),
       });
@@ -314,9 +313,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
       // 1. Tell server to clear all data
       const response = await fetch(`${API_URL}/clear-all`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: apiHeaders(token, user?.username),
       });
       
       const result = await response.json();

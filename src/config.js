@@ -7,8 +7,12 @@ if (!apiUrl) {
   apiUrl = RAILWAY_BACKEND_URL;
 }
 
-// Guard against accidental frontend/self URL configuration.
-if (/kml1frontend-production\.up\.railway\.app/i.test(apiUrl)) {
+// Guard against accidental frontend/self URL configuration (Docker default was localhost:3001).
+if (
+  /kml1frontend-production\.up\.railway\.app/i.test(apiUrl) ||
+  /^https?:\/\/localhost(?::\d+)?$/i.test(apiUrl) ||
+  /^http:\/\/127\.0\.0\.1(?::\d+)?$/i.test(apiUrl)
+) {
   apiUrl = RAILWAY_BACKEND_URL;
 }
 

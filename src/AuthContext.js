@@ -28,13 +28,13 @@ export const AuthProvider = ({ children }) => {
       stored = {};
     }
 
-    let { username: savedUsername, deviceId: savedDeviceId } = stored;
+    let { username: savedUsername, deviceId: savedDeviceId, token: savedToken } = stored;
 
     if (!savedDeviceId) {
       savedDeviceId = generateDeviceId();
     }
 
-    setToken("");
+    setToken(typeof savedToken === "string" ? savedToken : "");
     setUser({ username: savedUsername || "local-user" });
 
     setDeviceId(savedDeviceId);
@@ -45,18 +45,21 @@ export const AuthProvider = ({ children }) => {
       deviceId: savedDeviceId,
       remember: true,
       username: savedUsername || "local-user",
+      token: typeof savedToken === "string" ? savedToken : "",
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStored));
     setLoading(false);
   }, []);
 
-  const login = (userData) => {
+  const login = (userData, authToken) => {
     const ensuredDeviceId = deviceId || generateDeviceId();
     const resolvedUsername =
       (userData && userData.username && String(userData.username).trim()) ||
       "local-user";
+    const nextToken =
+      typeof authToken === "string" && authToken.trim() ? authToken.trim() : "";
     setUser({ username: resolvedUsername });
-    setToken("");
+    setToken(nextToken);
     setDeviceId(ensuredDeviceId);
     setRemember(true);
 
@@ -64,6 +67,7 @@ export const AuthProvider = ({ children }) => {
       deviceId: ensuredDeviceId,
       remember: true,
       username: resolvedUsername,
+      token: nextToken,
     };
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
@@ -78,6 +82,7 @@ export const AuthProvider = ({ children }) => {
       deviceId: deviceId || generateDeviceId(),
       remember: true,
       username: "local-user",
+      token: "",
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
   };
