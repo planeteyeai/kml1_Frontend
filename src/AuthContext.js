@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
     setUser({ username: savedUsername || "local-user" });
 
     setDeviceId(savedDeviceId);
-    setRemember(!!savedRemember);
+    setRemember(true);
 
     const nextStored = {
       ...stored,
