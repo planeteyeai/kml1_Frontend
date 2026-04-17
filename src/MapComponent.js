@@ -96,7 +96,7 @@ const SearchControl = ({ visible }) => {
 };
 
 const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffset, startDate, endDate, imageDirection, onSaveSuccess, initialGeoJson }, ref) => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const position = [18.5204, 73.8567]; // Pune center
   const [geoJsonData, setGeoJsonData] = useState(null);
   const [dataKey, setDataKey] = useState(0);
@@ -105,6 +105,20 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState({ show: false, message: '', type: '' });
   const featureGroupRef = React.useRef(null);
+  const localDraftKey = `kml_local_draft_${user?.username || 'anonymous'}`;
+
+  const saveDraftLocally = (payload) => {
+    try {
+      localStorage.setItem(localDraftKey, JSON.stringify({
+        ...payload,
+        savedAt: new Date().toISOString()
+      }));
+      return true;
+    } catch (e) {
+      console.error("Error writing local draft:", e);
+      return false;
+    }
+  };
 
   // Set initial data if provided
   useEffect(() => {
@@ -264,6 +278,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
       
       const result = await response.json();
       if (result.success) {
+        saveDraftLocally(payload);
         setSaveStatus({ show: true, message: 'Data saved successfully!', type: 'success' });
         if (onSaveSuccess && result.pipelinePath) {
           onSaveSuccess(result.pipelinePath);
@@ -271,11 +286,25 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
         // Auto-hide success message after 3 seconds
         setTimeout(() => setSaveStatus(prev => ({ ...prev, show: false })), 3000);
       } else {
-        setSaveStatus({ show: true, message: 'Error saving data: ' + result.message, type: 'error' });
+        const savedLocally = saveDraftLocally(payload);
+        setSaveStatus({
+          show: true,
+          message: savedLocally
+            ? `Server save failed (${result.message || 'unknown error'}). Draft saved locally on this device.`
+            : 'Error saving data: ' + (result.message || 'Unknown error'),
+          type: savedLocally ? 'success' : 'error'
+        });
       }
     } catch (error) {
       console.error("Error saving data:", error);
-      setSaveStatus({ show: true, message: 'Error saving data to server. Make sure the server is running.', type: 'error' });
+      const savedLocally = saveDraftLocally(payload);
+      setSaveStatus({
+        show: true,
+        message: savedLocally
+          ? 'Server unavailable. Draft saved locally on this device.'
+          : 'Error saving data to server. Make sure the server is running.',
+        type: savedLocally ? 'success' : 'error'
+      });
     } finally {
       setIsSaving(false);
     }
@@ -305,6 +334,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
         setDrawnFeatures([]);
         setDataKey(prev => prev + 1);
         setIsDataVisible(false);
+        localStorage.removeItem(localDraftKey);
         
         if (onSaveSuccess) {
           onSaveSuccess(''); // Reset last saved path

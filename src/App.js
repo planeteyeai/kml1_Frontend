@@ -19,6 +19,8 @@ import {
   useNavigate,
 } from "react-router-dom";
 
+const getLocalDraftKey = (username) => `kml_local_draft_${username || "anonymous"}`;
+
 function MainKmlApp() {
   const { user, token, logout, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -37,9 +39,9 @@ function MainKmlApp() {
   const [initialGeoJson, setInitialGeoJson] = useState(null);
   const mapRef = useRef();
 
-  // Load last saved data on mount
+  // Load last saved data on mount; fallback to local draft when server is unavailable.
   useEffect(() => {
-    if (!token) return;
+    if (!token || !user?.username) return;
 
     fetch(`${API_URL}/data`, {
       headers: {
@@ -65,10 +67,57 @@ function MainKmlApp() {
               features: lastEntry.geometry
             });
           }
+        } else {
+          try {
+            const cached = localStorage.getItem(getLocalDraftKey(user.username));
+            if (!cached) return;
+            const draft = JSON.parse(cached);
+            if (draft.metadata) {
+              setChainage(draft.metadata.chainage || '');
+              setOffsetType(draft.metadata.offsetType || '');
+              setLaneCount(draft.metadata.laneCount || '2');
+              setKmlMergeOffset(draft.metadata.kmlMergeOffset || '');
+              setStartDate(draft.metadata.startDate || '2026-02-10');
+              setEndDate(draft.metadata.endDate || '2026-02-20');
+              setImageDirection(draft.metadata.imageDirection || 'down_to_up');
+            }
+            if (Array.isArray(draft.geometry) && draft.geometry.length > 0) {
+              setInitialGeoJson({
+                type: 'FeatureCollection',
+                features: draft.geometry
+              });
+            }
+          } catch (e) {
+            console.error("Error loading local draft:", e);
+          }
         }
       })
-      .catch(err => console.error("Error loading initial data:", err));
-  }, [token]);
+      .catch(err => {
+        console.error("Error loading server data, trying local draft:", err);
+        try {
+          const cached = localStorage.getItem(getLocalDraftKey(user.username));
+          if (!cached) return;
+          const draft = JSON.parse(cached);
+          if (draft.metadata) {
+            setChainage(draft.metadata.chainage || '');
+            setOffsetType(draft.metadata.offsetType || '');
+            setLaneCount(draft.metadata.laneCount || '2');
+            setKmlMergeOffset(draft.metadata.kmlMergeOffset || '');
+            setStartDate(draft.metadata.startDate || '2026-02-10');
+            setEndDate(draft.metadata.endDate || '2026-02-20');
+            setImageDirection(draft.metadata.imageDirection || 'down_to_up');
+          }
+          if (Array.isArray(draft.geometry) && draft.geometry.length > 0) {
+            setInitialGeoJson({
+              type: 'FeatureCollection',
+              features: draft.geometry
+            });
+          }
+        } catch (e) {
+          console.error("Error loading local draft:", e);
+        }
+      });
+  }, [token, user?.username]);
 
   if (authLoading) {
     return <div className="loading-screen">Loading...</div>;
