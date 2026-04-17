@@ -4,7 +4,7 @@ if (!apiUrl) {
   apiUrl =
     process.env.NODE_ENV === "development"
       ? "http://localhost:3001"
-      : "https://kml-backend-production.up.railway.app";
+      : "https://kml-backend-production-501c.up.railway.app";
 }
 
 export default apiUrl.replace(/\/+$/, "");
