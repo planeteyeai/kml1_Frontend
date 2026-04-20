@@ -37,4 +37,15 @@ if (
   apiUrl = HOSTED_KML_API_BASE;
 }
 
-export default apiUrl.replace(/\/+$/, "");
+const resolvedApiUrl = apiUrl.replace(/\/+$/, "");
+
+/**
+ * Use for window.open / window.location. CRA's dev proxy only applies to fetch/XHR;
+ * a relative URL here hits the React dev server and returns index.html (looks like "redirect home").
+ * When the default API URL is "" in development, use the real backend host.
+ */
+export function getApiBaseForNavigation() {
+  return resolvedApiUrl || HOSTED_KML_API_BASE.replace(/\/+$/, "");
+}
+
+export default resolvedApiUrl;
