@@ -256,6 +256,10 @@
 .cards-section--kml .kml-pipeline-link-wrap {
   margin-top: 6px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
 .cards-section--kml .one-link {
