@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './PipelineView.css';
-import API_URL, { getApiBaseForNavigation } from './config';
-import { apiHeaders, authQuery } from './apiHeaders';
-import { openDistressPrediction } from './distressPredictionUrl';
+import API_URL from './config';
+import { apiHeaders, usernameQuery } from './apiHeaders';
 import { useAuth } from './AuthContext';
 
 const PipelineView = ({ onClose, initialPath = '' }) => {
@@ -62,8 +61,6 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
       });
   }, [token, user?.username]);
 
-  const queryAuth = () => authQuery(token, user?.username);
-
   useEffect(() => {
     fetchItems(initialPath);
   }, [fetchItems, initialPath]);
@@ -74,7 +71,7 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
     } else {
       // It's a file, maybe download or view it?
       // For now, let's open it in a new tab if it's served statically
-      window.open(`${getApiBaseForNavigation()}/pipeline-files/${item.path}?${queryAuth()}`, '_blank');
+      window.open(`${API_URL}/pipeline-files/${item.path}?${usernameQuery(user?.username)}`, '_blank');
     }
   };
 
@@ -110,18 +107,49 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
     return /_merged\.(png|kml)$/i.test(name);
   };
 
-  const handleDownloadClick = (e, item) => {
-    e.stopPropagation(); // Prevent folder opening
-    if (item.type === 'folder') {
-      window.location.href = `${getApiBaseForNavigation()}/download-folder?path=${encodeURIComponent(item.path)}&${queryAuth()}`;
-    } else {
-      window.open(`${getApiBaseForNavigation()}/pipeline-files/${item.path}?${queryAuth()}`, '_blank');
+  const handleDownloadClick = async (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const base = API_URL || "";
+    const userQ = usernameQuery(user?.username);
+    const headers = apiHeaders(token, user?.username);
+
+    try {
+      if (item.type === "folder") {
+        const url = `${base}/download-folder?path=${encodeURIComponent(item.path)}&${userQ}`;
+        const res = await fetch(url, { headers });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          console.error("Folder download failed:", res.status, text);
+          return;
+        }
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = `${(item.name || "folder").replace(/[/\\?%*:|"<>]/g, "_")}.zip`;
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+      } else {
+        const encodedPath = (item.path || "")
+          .split("/")
+          .map((seg) => encodeURIComponent(seg))
+          .join("/");
+        const url = `${base}/pipeline-files/${encodedPath}?${userQ}`;
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      console.error("Download error:", err);
     }
   };
 
-  const handleDistressIdentifyClick = (e) => {
+  const handleDistressIdentifyClick = (e, item) => {
     if (e) e.stopPropagation();
-    openDistressPrediction({ username: user?.username, token });
+    window.open('https://distress-prediction.onrender.com/', '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -186,8 +214,9 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
                     )}
                     {isRecentlyModified(item.modifiedAt) && <span className="new-badge">NEW</span>}
                     
-                    <button 
-                      className="download-icon-btn" 
+                    <button
+                      type="button"
+                      className="download-icon-btn"
                       onClick={(e) => handleDownloadClick(e, item)}
                       title={item.type === 'folder' ? "Download as ZIP" : "Download File"}
                     >
