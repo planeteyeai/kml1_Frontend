@@ -8,6 +8,7 @@ import Register from "./Register";
 import { useAuth } from "./AuthContext";
 import API_URL from "./config";
 import { apiHeaders } from "./apiHeaders";
+import { openDistressPrediction } from "./distressPredictionUrl";
 import DistressReport from "./DistressReport";
 import DistressPredicted from "./DistressPredicted";
 import InventoryCard from "./InventoryCard";
@@ -206,6 +207,26 @@ function MainKmlApp() {
                 </div>
                 <div className="landing-card-footer">
                   <span className="landing-card-cta secondary">Get Started</span>
+                </div>
+              </button>
+              <button
+                className="landing-card landing-card-secondary"
+                type="button"
+                onClick={() => openDistressPrediction({ username: user.username, token })}
+              >
+                <div className="landing-card-logo landing-card-logo-distress">
+                  <img
+                    src="/Distress_report.png"
+                    alt="Distress data portal"
+                    className="landing-card-logo-image"
+                  />
+                </div>
+                <div className="landing-card-label">Distress data</div>
+                <div className="landing-card-description">
+                  Open the distress prediction app with your account and API context for computation.
+                </div>
+                <div className="landing-card-footer">
+                  <span className="landing-card-cta secondary">Open portal</span>
                 </div>
               </button>
               <InventoryCard onGetStarted={() => navigate("/inventory/kml-1")} />
@@ -418,6 +439,13 @@ function MainKmlApp() {
                 onClick={() => setShowMergeImages(true)}
               >
                 merge KML images
+              </button>
+              <button
+                type="button"
+                className="one-link"
+                onClick={() => openDistressPrediction({ username: user.username, token })}
+              >
+                distress dashboard
               </button>
             </div>
           </div>

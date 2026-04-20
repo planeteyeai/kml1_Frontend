@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import './PipelineView.css';
 import API_URL, { getApiBaseForNavigation } from './config';
 import { apiHeaders, authQuery } from './apiHeaders';
+import { openDistressPrediction } from './distressPredictionUrl';
 import { useAuth } from './AuthContext';
 
 const PipelineView = ({ onClose, initialPath = '' }) => {
@@ -118,9 +119,9 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
     }
   };
 
-  const handleDistressIdentifyClick = (e, item) => {
+  const handleDistressIdentifyClick = (e) => {
     if (e) e.stopPropagation();
-    window.open('https://distress-prediction.onrender.com/', '_blank', 'noopener,noreferrer');
+    openDistressPrediction({ username: user?.username, token });
   };
 
   return (
