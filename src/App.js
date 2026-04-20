@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from "react";
 import "./App.css";
 import MapComponent from "./MapComponent";
 import PipelineView from "./PipelineView";
-import MergeImagesView from "./MergeImagesView";
 import Login from "./Login";
 import Register from "./Register";
 import { useAuth } from "./AuthContext";
@@ -35,7 +34,6 @@ function MainKmlApp() {
   const [endDate, setEndDate] = useState('2026-02-20');
   const [imageDirection, setImageDirection] = useState('down_to_up');
   const [showPipeline, setShowPipeline] = useState(false);
-  const [showMergeImages, setShowMergeImages] = useState(false);
   const [lastSavedPath, setLastSavedPath] = useState('');
   const [pipelineInitialPath, setPipelineInitialPath] = useState('');
   const [initialGeoJson, setInitialGeoJson] = useState(null);
@@ -412,13 +410,6 @@ function MainKmlApp() {
               >
                 go to the kml_pipeline
               </button>
-              <button
-                type="button"
-                className="one-link"
-                onClick={() => setShowMergeImages(true)}
-              >
-                merge KML images
-              </button>
             </div>
           </div>
         </div>
@@ -431,9 +422,6 @@ function MainKmlApp() {
             setPipelineInitialPath(''); // Reset after closing
           }} 
         />
-      )}
-      {showMergeImages && (
-        <MergeImagesView onClose={() => setShowMergeImages(false)} />
       )}
     </div>
   );
