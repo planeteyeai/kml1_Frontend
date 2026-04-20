@@ -10,6 +10,9 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
+  const [distressLoading, setDistressLoading] = useState(false);
+  const [distressError, setDistressError] = useState("");
+  const [distressResults, setDistressResults] = useState(null);
 
   const fetchItems = useCallback((path = '') => {
     setLoading(true);
@@ -152,6 +155,38 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
     window.open('https://distress-prediction.onrender.com/', '_blank', 'noopener,noreferrer');
   };
 
+  const handleRunDistressPipeline = async (e) => {
+    if (e) e.stopPropagation();
+    setDistressLoading(true);
+    setDistressError("");
+    try {
+      const base = API_URL || "";
+      const res = await fetch(`${base}/api/distress-imagewise`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...apiHeaders(token, user?.username),
+        },
+        body: JSON.stringify({ path: currentPath || "" }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.message || payload.error || "Distress pipeline failed");
+      }
+      if (!payload || typeof payload.results_by_image !== "object") {
+        throw new Error("Invalid distress response format");
+      }
+      setDistressResults(payload.results_by_image || {});
+    } catch (err) {
+      console.error("Distress pipeline error:", err);
+      setDistressError(err.message || "Failed to run distress pipeline");
+    } finally {
+      setDistressLoading(false);
+    }
+  };
+
+  const showBatchDistressButton = Boolean(currentPath && (isMergeKmlFolder() || isMergeImagesFolder()));
+
   return (
     <div className="pipeline-overlay">
       <div className="pipeline-container">
@@ -171,6 +206,16 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
                 Distress Identify
               </button>
             )}
+            {showBatchDistressButton && (
+              <button
+                className="back-button distress-run-button"
+                onClick={handleRunDistressPipeline}
+                title="Run distress on all generated images in this folder"
+                disabled={distressLoading}
+              >
+                {distressLoading ? "Running..." : "Get Distress Data"}
+              </button>
+            )}
             <h2>{currentPath ? currentPath.split('/').pop() : 'Project Pipeline'}</h2>
             {!currentPath && <span className="sort-hint">(Sorted by newest first)</span>}
           </div>
@@ -178,6 +223,21 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
         </div>
         
         <div className="pipeline-content">
+          {!!distressError && (
+            <div className="distress-result-box distress-error-box">
+              {distressError}
+            </div>
+          )}
+          {distressResults && (
+            <div className="distress-result-box">
+              <div className="distress-result-title">
+                Image-wise distress response ({Object.keys(distressResults).length} images)
+              </div>
+              <pre className="distress-result-json">
+                {JSON.stringify({ results_by_image: distressResults }, null, 2)}
+              </pre>
+            </div>
+          )}
           {fetchError && (
             <div className="empty-state" style={{ color: "#f87171" }}>
               <p>{fetchError}</p>

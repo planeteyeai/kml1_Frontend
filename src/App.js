@@ -36,6 +36,9 @@ function MainKmlApp() {
   const [lastSavedPath, setLastSavedPath] = useState('');
   const [pipelineInitialPath, setPipelineInitialPath] = useState('');
   const [initialGeoJson, setInitialGeoJson] = useState(null);
+  const [distressLoading, setDistressLoading] = useState(false);
+  const [distressError, setDistressError] = useState('');
+  const [distressResults, setDistressResults] = useState(null);
   const mapRef = useRef();
 
   // Load last saved data on mount; fallback to local draft when server is unavailable.
@@ -248,6 +251,160 @@ function MainKmlApp() {
     }
   };
 
+  const handleGetDistressData = async () => {
+    setDistressLoading(true);
+    setDistressError('');
+    try {
+      const response = await fetch(`${API_URL}/api/distress-imagewise`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...apiHeaders(token, user?.username),
+        },
+        // Empty body means backend auto-picks merged rotated images from *_kml_merge_images.
+        body: JSON.stringify({}),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.message || payload.error || 'Failed to get distress data');
+      }
+      if (!payload || typeof payload.results_by_image !== 'object') {
+        throw new Error('Invalid distress response format');
+      }
+      setDistressResults(payload.results_by_image);
+    } catch (error) {
+      console.error('Error fetching distress data:', error);
+      setDistressError(error.message || 'Failed to fetch distress data');
+      setDistressResults(null);
+    } finally {
+      setDistressLoading(false);
+    }
+  };
+
+  const escapeCsv = (value) => {
+    if (value === null || value === undefined) return '';
+    const text = String(value);
+    if (/[",\n]/.test(text)) {
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+  };
+
+  const buildDistressCsv = (resultsByImage) => {
+    const headers = [
+      'image_name',
+      'run_id',
+      'components',
+      'edges',
+      'reported_crack',
+      'predicted_crack',
+      'reported_pothole',
+      'predicted_pothole',
+      'reported_alligator_crack',
+      'predicted_alligator_crack',
+      'defect_id',
+      'defect_type',
+      'severity',
+      'start',
+      'end',
+      'length',
+      'max_depth',
+      'width',
+      'sensors',
+      'confidence',
+      'reported_depth',
+      'reported_width',
+      'total_width',
+      'pothole_area',
+    ];
+
+    const lines = [headers.join(',')];
+    const entries = Object.entries(resultsByImage || {});
+
+    entries.forEach(([imageName, imageData]) => {
+      const counts = imageData?.counts || {};
+      const meta = imageData?.meta || {};
+      const defects = Array.isArray(imageData?.defects) ? imageData.defects : [];
+
+      if (defects.length === 0) {
+        const row = [
+          imageName,
+          imageData?.run_id || '',
+          meta.components ?? '',
+          meta.edges ?? '',
+          counts.reported_crack ?? 0,
+          counts.predicted_crack ?? 0,
+          counts.reported_pothole ?? 0,
+          counts.predicted_pothole ?? 0,
+          counts.reported_alligator_crack ?? 0,
+          counts.predicted_alligator_crack ?? 0,
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+        ];
+        lines.push(row.map(escapeCsv).join(','));
+        return;
+      }
+
+      defects.forEach((defect) => {
+        const row = [
+          imageName,
+          imageData?.run_id || '',
+          meta.components ?? '',
+          meta.edges ?? '',
+          counts.reported_crack ?? 0,
+          counts.predicted_crack ?? 0,
+          counts.reported_pothole ?? 0,
+          counts.predicted_pothole ?? 0,
+          counts.reported_alligator_crack ?? 0,
+          counts.predicted_alligator_crack ?? 0,
+          defect?.id ?? '',
+          defect?.type ?? '',
+          defect?.severity ?? '',
+          defect?.start ?? '',
+          defect?.end ?? '',
+          defect?.length ?? '',
+          defect?.max_depth ?? '',
+          defect?.width ?? '',
+          defect?.sensors ?? '',
+          defect?.confidence ?? '',
+          defect?.reported_depth ?? '',
+          defect?.reported_width ?? '',
+          defect?.total_width ?? '',
+          defect?.pothole_area ?? '',
+        ];
+        lines.push(row.map(escapeCsv).join(','));
+      });
+    });
+
+    return lines.join('\n');
+  };
+
+  const handleDownloadDistressExcel = () => {
+    if (!distressResults) return;
+    const csv = buildDistressCsv(distressResults);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `distress_results_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="App">
       <header className="app-header">
@@ -409,6 +566,14 @@ function MainKmlApp() {
             >
               Clear All Data
             </button>
+            <button
+              type="button"
+              className="distress-action-button"
+              onClick={handleGetDistressData}
+              disabled={distressLoading}
+            >
+              {distressLoading ? 'Getting...' : 'Get Distress Data'}
+            </button>
             <div className="kml-pipeline-link-wrap">
               <button
                 type="button"
@@ -429,6 +594,43 @@ function MainKmlApp() {
             setPipelineInitialPath(''); // Reset after closing
           }} 
         />
+      )}
+      {(distressResults || distressError) && (
+        <div className="pipeline-overlay">
+          <div className="pipeline-container distress-response-modal">
+            <div className="pipeline-header">
+              <div className="header-left">
+                <h2>Image-wise Distress Data</h2>
+              </div>
+              {distressResults && (
+                <button
+                  className="distress-download-button"
+                  onClick={handleDownloadDistressExcel}
+                >
+                  Download Excel
+                </button>
+              )}
+              <button
+                className="close-button"
+                onClick={() => {
+                  setDistressResults(null);
+                  setDistressError('');
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="pipeline-content">
+              {distressError ? (
+                <div className="distress-inline-error">{distressError}</div>
+              ) : (
+                <pre className="distress-response-json">
+                  {JSON.stringify({ results_by_image: distressResults || {} }, null, 2)}
+                </pre>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
