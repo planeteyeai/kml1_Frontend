@@ -281,11 +281,15 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
         setTimeout(() => setSaveStatus(prev => ({ ...prev, show: false })), 3000);
       } else {
         const savedLocally = saveDraftLocally(payload);
+        const detailText =
+          result && typeof result.details === "string" && result.details.trim()
+            ? ` Details: ${result.details}`
+            : "";
         setSaveStatus({
           show: true,
           message: savedLocally
-            ? `Server save failed (${result.message || 'unknown error'}). Draft saved locally on this device.`
-            : 'Error saving data: ' + (result.message || 'Unknown error'),
+            ? `Server save failed (${result.message || 'unknown error'}).${detailText} Draft saved locally on this device.`
+            : 'Error saving data: ' + (result.message || 'Unknown error') + detailText,
           type: savedLocally ? 'success' : 'error'
         });
       }
