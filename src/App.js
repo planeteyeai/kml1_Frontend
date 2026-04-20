@@ -264,9 +264,23 @@ function MainKmlApp() {
         // Empty body means backend auto-picks merged rotated images from *_kml_merge_images.
         body: JSON.stringify({}),
       });
-      const payload = await response.json();
+      const raw = await response.text();
+      let payload = {};
+      try {
+        payload = raw ? JSON.parse(raw) : {};
+      } catch {
+        payload = { raw };
+      }
       if (!response.ok) {
-        throw new Error(payload.message || payload.error || 'Failed to get distress data');
+        const detailError = Array.isArray(payload?.detail)
+          ? payload.detail.map((d) => d?.msg || JSON.stringify(d)).join(', ')
+          : payload?.detail?.error || payload?.detail?.message || payload?.detail;
+        throw new Error(
+          payload?.message ||
+            payload?.error ||
+            detailError ||
+            `Failed to get distress data (${response.status})`
+        );
       }
       if (!payload || typeof payload.results_by_image !== 'object') {
         throw new Error('Invalid distress response format');

@@ -169,9 +169,23 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
         },
         body: JSON.stringify({ path: currentPath || "" }),
       });
-      const payload = await res.json();
+      const raw = await res.text();
+      let payload = {};
+      try {
+        payload = raw ? JSON.parse(raw) : {};
+      } catch {
+        payload = { raw };
+      }
       if (!res.ok) {
-        throw new Error(payload.message || payload.error || "Distress pipeline failed");
+        const detailError = Array.isArray(payload?.detail)
+          ? payload.detail.map((d) => d?.msg || JSON.stringify(d)).join(", ")
+          : payload?.detail?.error || payload?.detail?.message || payload?.detail;
+        throw new Error(
+          payload?.message ||
+            payload?.error ||
+            detailError ||
+            `Distress pipeline failed (${res.status})`
+        );
       }
       if (!payload || typeof payload.results_by_image !== "object") {
         throw new Error("Invalid distress response format");
