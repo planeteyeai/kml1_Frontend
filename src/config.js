@@ -1,10 +1,14 @@
 /**
- * Hosted KML backend on Railway (canonical base URL, no trailing slash).
+ * Hosted URLs on Railway.
  * Health check: GET / → `{"status":"Backend is running successfully","timestamp":"..."}`.
  * @see https://kml-backend-production-501c.up.railway.app/
  */
 export const HOSTED_KML_API_BASE =
   "https://kml-backend-production-501c.up.railway.app";
+export const HOSTED_FRONTEND_BASE =
+  "https://kml1frontend-production.up.railway.app";
+export const HOSTED_DISTRESS_BATCH_URL =
+  "https://distressanalyzerv2-0.up.railway.app/process-rotated-images-batch/";
 
 function readInitialApiUrl() {
   if (typeof window !== "undefined" && window.__KML_API_URL__) {
@@ -26,7 +30,7 @@ if (!apiUrl) {
 }
 
 // Never call the frontend host as the API (bad Docker/build env). Do not rewrite intentional localhost API in dev.
-if (/kml1frontend-production\.up\.railway\.app/i.test(apiUrl)) {
+if (new RegExp(HOSTED_FRONTEND_BASE.replace(/^https?:\/\//i, ""), "i").test(apiUrl)) {
   apiUrl = HOSTED_KML_API_BASE;
 }
 if (
