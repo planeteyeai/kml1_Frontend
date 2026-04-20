@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './PipelineView.css';
 import API_URL from './config';
-import { apiHeaders, usernameQuery } from './apiHeaders';
+import { apiHeaders, authQuery } from './apiHeaders';
 import { useAuth } from './AuthContext';
 
 const PipelineView = ({ onClose, initialPath = '' }) => {
@@ -61,6 +61,8 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
       });
   }, [token, user?.username]);
 
+  const queryAuth = () => authQuery(token, user?.username);
+
   useEffect(() => {
     fetchItems(initialPath);
   }, [fetchItems, initialPath]);
@@ -71,7 +73,7 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
     } else {
       // It's a file, maybe download or view it?
       // For now, let's open it in a new tab if it's served statically
-      window.open(`${API_URL}/pipeline-files/${item.path}?${usernameQuery(user?.username)}`, '_blank');
+      window.open(`${API_URL}/pipeline-files/${item.path}?${queryAuth()}`, '_blank');
     }
   };
 
@@ -110,9 +112,9 @@ const PipelineView = ({ onClose, initialPath = '' }) => {
   const handleDownloadClick = (e, item) => {
     e.stopPropagation(); // Prevent folder opening
     if (item.type === 'folder') {
-      window.location.href = `${API_URL}/download-folder?path=${encodeURIComponent(item.path)}&${usernameQuery(user?.username)}`;
+      window.location.href = `${API_URL}/download-folder?path=${encodeURIComponent(item.path)}&${queryAuth()}`;
     } else {
-      window.open(`${API_URL}/pipeline-files/${item.path}?${usernameQuery(user?.username)}`, '_blank');
+      window.open(`${API_URL}/pipeline-files/${item.path}?${queryAuth()}`, '_blank');
     }
   };
 

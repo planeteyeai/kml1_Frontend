@@ -1,19 +1,24 @@
 /**
- * Backend resolves the user from JWT (optional), x-username, body.username, or query.username.
- * Always send x-username so pipeline/save hit the correct user folder when the JWT middleware is permissive.
+ * Backend identifies the signed-in user from JWT (Authorization or ?token=).
+ * x-username is optional metadata only; authorization is enforced via the token.
  */
 export function apiHeaders(token, username) {
-  const headers = {
-    "x-username": (username && String(username).trim()) || "local-user",
-  };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  const headers = {};
+  const u = (username && String(username).trim()) || "";
+  if (u) {
+    headers["x-username"] = u;
+  }
+  if (token && String(token).trim()) {
+    headers.Authorization = `Bearer ${token.trim()}`;
   }
   return headers;
 }
 
-/** For window.open / navigation where headers are not available */
-export function usernameQuery(username) {
-  const u = (username && String(username).trim()) || "local-user";
-  return `username=${encodeURIComponent(u)}`;
+/** For window.open / navigation where Authorization header is not sent */
+export function authQuery(token, username) {
+  const p = new URLSearchParams();
+  const u = (username && String(username).trim()) || "";
+  if (u) p.set("username", u);
+  if (token && String(token).trim()) p.set("token", token.trim());
+  return p.toString();
 }

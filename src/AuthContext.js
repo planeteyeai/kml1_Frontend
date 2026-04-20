@@ -14,7 +14,7 @@ function generateDeviceId() {
 }
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState({ username: "local-user" });
+  const [user, setUser] = useState(null);
   const [token, setToken] = useState("");
   const [deviceId, setDeviceId] = useState(null);
   const [remember, setRemember] = useState(false);
@@ -34,8 +34,17 @@ export const AuthProvider = ({ children }) => {
       savedDeviceId = generateDeviceId();
     }
 
-    setToken(typeof savedToken === "string" ? savedToken : "");
-    setUser({ username: savedUsername || "local-user" });
+    const tokenStr = typeof savedToken === "string" ? savedToken.trim() : "";
+    const userStr =
+      typeof savedUsername === "string" ? savedUsername.trim() : "";
+
+    if (tokenStr && userStr) {
+      setToken(tokenStr);
+      setUser({ username: userStr });
+    } else {
+      setToken("");
+      setUser(null);
+    }
 
     setDeviceId(savedDeviceId);
     setRemember(true);
@@ -44,8 +53,8 @@ export const AuthProvider = ({ children }) => {
       ...stored,
       deviceId: savedDeviceId,
       remember: true,
-      username: savedUsername || "local-user",
-      token: typeof savedToken === "string" ? savedToken : "",
+      username: userStr,
+      token: tokenStr,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStored));
     setLoading(false);
@@ -54,10 +63,12 @@ export const AuthProvider = ({ children }) => {
   const login = (userData, authToken) => {
     const ensuredDeviceId = deviceId || generateDeviceId();
     const resolvedUsername =
-      (userData && userData.username && String(userData.username).trim()) ||
-      "local-user";
+      (userData && userData.username && String(userData.username).trim()) || "";
     const nextToken =
       typeof authToken === "string" && authToken.trim() ? authToken.trim() : "";
+    if (!resolvedUsername || !nextToken) {
+      return;
+    }
     setUser({ username: resolvedUsername });
     setToken(nextToken);
     setDeviceId(ensuredDeviceId);
@@ -74,14 +85,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    // Keep no-login flow active; reset to a default local user.
-    setUser({ username: "local-user" });
+    setUser(null);
     setToken("");
     setRemember(true);
     const stored = {
       deviceId: deviceId || generateDeviceId(),
       remember: true,
-      username: "local-user",
+      username: "",
       token: "",
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));

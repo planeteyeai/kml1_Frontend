@@ -23,9 +23,8 @@ import {
 const getLocalDraftKey = (username) => `kml_local_draft_${username || "anonymous"}`;
 
 function MainKmlApp() {
-  const { user, token, logout, loading: authLoading } = useAuth();
+  const { user, token, logout } = useAuth();
   const navigate = useNavigate();
-  const [isRegistering, setIsRegistering] = useState(false);
   const [showLanding, setShowLanding] = useState(true);
   const [chainage, setChainage] = useState('');
   const [offsetType, setOffsetType] = useState('');
@@ -42,7 +41,7 @@ function MainKmlApp() {
 
   // Load last saved data on mount; fallback to local draft when server is unavailable.
   useEffect(() => {
-    if (!user?.username) return;
+    if (!user?.username || !token) return;
 
     fetch(`${API_URL}/data`, {
       headers: apiHeaders(token, user.username),
@@ -117,18 +116,6 @@ function MainKmlApp() {
         }
       });
   }, [token, user?.username]);
-
-  if (authLoading) {
-    return <div className="loading-screen">Loading...</div>;
-  }
-
-  if (!user) {
-    return isRegistering ? (
-      <Register onSwitchToLogin={() => setIsRegistering(false)} />
-    ) : (
-      <Login onSwitchToRegister={() => setIsRegistering(true)} />
-    );
-  }
 
   if (showLanding) {
     return (
@@ -440,17 +427,38 @@ function MainKmlApp() {
   );
 }
 
+function AuthenticatedRoutes() {
+  const { user, token, loading } = useAuth();
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  if (loading) {
+    return <div className="loading-screen">Loading...</div>;
+  }
+
+  if (!user || !token) {
+    return isRegistering ? (
+      <Register onSwitchToLogin={() => setIsRegistering(false)} />
+    ) : (
+      <Login onSwitchToRegister={() => setIsRegistering(true)} />
+    );
+  }
+
+  return (
+    <Routes>
+      <Route path="/distress-report" element={<DistressReport />} />
+      <Route path="/distress-predicted" element={<DistressPredicted />} />
+      <Route path="/inventory" element={<KMLSelection />} />
+      <Route path="/inventory/kml-1" element={<KML1Form />} />
+      <Route path="/inventory/kml-2" element={<KML2Form />} />
+      <Route path="/*" element={<MainKmlApp />} />
+    </Routes>
+  );
+}
+
 function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/distress-report" element={<DistressReport />} />
-        <Route path="/distress-predicted" element={<DistressPredicted />} />
-        <Route path="/inventory" element={<KMLSelection />} />
-        <Route path="/inventory/kml-1" element={<KML1Form />} />
-        <Route path="/inventory/kml-2" element={<KML2Form />} />
-        <Route path="/*" element={<MainKmlApp />} />
-      </Routes>
+      <AuthenticatedRoutes />
     </Router>
   );
 }
