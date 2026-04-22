@@ -40,6 +40,7 @@ function MainKmlApp() {
   const [distressError, setDistressError] = useState('');
   const [distressResults, setDistressResults] = useState(null);
   const mapRef = useRef();
+  const DISTRESS_PREDICTION_URL = 'https://distress-prediction.onrender.com/';
 
   // Load last saved data on mount; fallback to local draft when server is unavailable.
   useEffect(() => {
@@ -419,6 +420,15 @@ function MainKmlApp() {
     URL.revokeObjectURL(url);
   };
 
+  const handleOpenDistressPrediction = () => {
+    const params = new URLSearchParams();
+    if (user?.username) params.set('username', user.username);
+    if (token) params.set('token', token);
+    params.set('source', 'kml-tools');
+    const targetUrl = `${DISTRESS_PREDICTION_URL}?${params.toString()}`;
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="App">
       <header className="app-header">
@@ -587,6 +597,13 @@ function MainKmlApp() {
               disabled={distressLoading}
             >
               {distressLoading ? 'Getting...' : 'Get Distress Data'}
+            </button>
+            <button
+              type="button"
+              className="distress-action-button"
+              onClick={handleOpenDistressPrediction}
+            >
+              Distress Prediction
             </button>
             <div className="kml-pipeline-link-wrap">
               <button

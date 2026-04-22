@@ -96,6 +96,57 @@ const SearchControl = ({ visible }) => {
   return null;
 };
 
+const escapeXml = (value = '') =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+const coordinatesToKml = (coordinates = []) =>
+  coordinates.map((pair) => `${pair[0]},${pair[1]},0`).join(' ');
+
+const geometryToPlacemark = (feature, index) => {
+  const geometry = feature?.geometry;
+  if (!geometry) return '';
+
+  const name = escapeXml(feature?.properties?.name || `Feature ${index + 1}`);
+  const type = geometry.type;
+
+  if (type === 'LineString') {
+    return `<Placemark><name>${name}</name><LineString><tessellate>1</tessellate><coordinates>${coordinatesToKml(geometry.coordinates)}</coordinates></LineString></Placemark>`;
+  }
+  if (type === 'MultiLineString') {
+    return geometry.coordinates
+      .map(
+        (line, lineIndex) =>
+          `<Placemark><name>${name} ${lineIndex + 1}</name><LineString><tessellate>1</tessellate><coordinates>${coordinatesToKml(line)}</coordinates></LineString></Placemark>`
+      )
+      .join('');
+  }
+  if (type === 'Polygon') {
+    const outer = geometry.coordinates?.[0] || [];
+    return `<Placemark><name>${name}</name><Polygon><outerBoundaryIs><LinearRing><coordinates>${coordinatesToKml(outer)}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;
+  }
+  if (type === 'Point') {
+    return `<Placemark><name>${name}</name><Point><coordinates>${coordinatesToKml([geometry.coordinates])}</coordinates></Point></Placemark>`;
+  }
+
+  return '';
+};
+
+const featureCollectionToKml = (features = [], docName = 'Drawn KML') => {
+  const placemarks = features.map((feature, index) => geometryToPlacemark(feature, index)).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${escapeXml(docName)}</name>
+    ${placemarks}
+  </Document>
+</kml>`;
+};
+
 const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffset, startDate, endDate, imageDirection, onSaveSuccess, initialGeoJson }, ref) => {
   const { token, user } = useAuth();
   const position = [18.5204, 73.8567]; // Pune center
@@ -377,6 +428,63 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
     }
   };
 
+  const getCurrentDrawnFeatures = () => {
+    if (!featureGroupRef.current) return [];
+    return featureGroupRef.current.getLayers().map((layer) => layer.toGeoJSON());
+  };
+
+  const getAllKnownFeatures = () => {
+    const current = getCurrentDrawnFeatures();
+    if (current.length > 0) return current;
+    return Array.isArray(drawnFeatures) ? drawnFeatures : [];
+  };
+
+  const hasDrawnGeometry = getAllKnownFeatures().some((feature) =>
+    !!feature?.geometry?.type
+  );
+
+  const triggerDrawPolyline = () => {
+    const drawLineButton = document.querySelector('.leaflet-draw-draw-polyline');
+    if (drawLineButton && typeof drawLineButton.click === 'function') {
+      drawLineButton.click();
+    } else {
+      alert('Use the draw tool on the left to draw a KML line.');
+    }
+  };
+
+  const downloadDrawnKml = () => {
+    const allDrawn = getAllKnownFeatures().filter((feature) => !!feature?.geometry?.type);
+    if (!allDrawn.length) {
+      alert('No drawn geometry found. Please draw and finish a line first.');
+      return;
+    }
+
+    const kmlText = featureCollectionToKml(allDrawn, `${user?.username || 'user'}-drawn-kml`);
+    if (!kmlText.includes('<Placemark>')) {
+      alert('No exportable geometry found for KML download.');
+      return;
+    }
+
+    const blob = new Blob([kmlText], { type: 'application/vnd.google-earth.kml+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${user?.username || 'drawn'}-kml.kml`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleDownloadKmlButton = () => {
+    if (!hasDrawnGeometry) {
+      const shouldDraw = window.confirm('No drawn line found. Press OK to start drawing KML.');
+      if (shouldDraw) triggerDrawPolyline();
+      return;
+    }
+    downloadDrawnKml();
+  };
+
   return (
     <div className="map-wrapper" style={{ position: 'relative' }}>
       {isSaving && (
@@ -404,6 +512,11 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
           onChange={handleFileChange}
           style={{ display: 'none' }}
         />
+      </div>
+      <div className="kml-download-container">
+        <button type="button" className="kml-download-button" onClick={handleDownloadKmlButton}>
+          Download KML
+        </button>
       </div>
       <MapContainer 
         center={position} 

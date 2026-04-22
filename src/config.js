@@ -20,12 +20,11 @@ function readInitialApiUrl() {
 
 let apiUrl = readInitialApiUrl();
 
-// Development: use same-origin URLs so Create React App's "proxy" forwards to the backend (no browser CORS).
-// Set REACT_APP_API_URL in .env.local if you run the API on your machine (e.g. http://localhost:3001).
+// Development: default to local backend directly (no proxy dependency).
 if (!apiUrl) {
   apiUrl =
     process.env.NODE_ENV === "development"
-      ? ""
+      ? "http://localhost:9008"
       : HOSTED_KML_API_BASE;
 }
 
@@ -39,6 +38,14 @@ if (
     /^http:\/\/127\.0\.0\.1(?::\d+)?$/i.test(apiUrl))
 ) {
   apiUrl = HOSTED_KML_API_BASE;
+}
+
+// In dev, never let API URL point to the frontend dev server (causes /api self-loop).
+if (
+  process.env.NODE_ENV === "development" &&
+  /^https?:\/\/localhost:3001$/i.test(apiUrl)
+) {
+  apiUrl = "http://localhost:9008";
 }
 
 export default apiUrl.replace(/\/+$/, "");
