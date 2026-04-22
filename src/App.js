@@ -493,16 +493,30 @@ function MainKmlApp() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Distress');
 
-    const chainageRegex = /chainage_(\d+(?:\.\d+)?)_to_(\d+(?:\.\d+)?)/i;
+    const extractChainageRange = (value) => {
+      const text = String(value || '');
+      // Supports formats like:
+      // Chainage_0.100_to_0.200.png
+      // chainage-0.100-to-0.200
+      // Chainage 0.100 to 0.200
+      const match = text.match(
+        /chainage[\s_-]*(\d+(?:\.\d+)?)[\s_-]*to[\s_-]*(\d+(?:\.\d+)?)/i
+      );
+      if (!match) return null;
+      const start = Number(match[1]);
+      const end = Number(match[2]);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+      return { start, end };
+    };
     let minStart = Number.POSITIVE_INFINITY;
     let maxEnd = Number.NEGATIVE_INFINITY;
-    Object.keys(distressResults).forEach((imageName) => {
-      const match = String(imageName || '').match(chainageRegex);
-      if (!match) return;
-      const s = Number(match[1]);
-      const e = Number(match[2]);
-      if (Number.isFinite(s) && s < minStart) minStart = s;
-      if (Number.isFinite(e) && e > maxEnd) maxEnd = e;
+    Object.entries(distressResults).forEach(([imageName, imageData]) => {
+      const fromName = extractChainageRange(imageName);
+      const fromRunId = extractChainageRange(imageData?.run_id);
+      const range = fromName || fromRunId;
+      if (!range) return;
+      if (range.start < minStart) minStart = range.start;
+      if (range.end > maxEnd) maxEnd = range.end;
     });
     const format3 = (n) => Number(n).toFixed(3);
     const filename =
