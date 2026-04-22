@@ -18,7 +18,6 @@ import {
   Route,
   useNavigate,
 } from "react-router-dom";
-import * as XLSX from "xlsx";
 
 const getLocalDraftKey = (username) => `kml_local_draft_${username || "anonymous"}`;
 
@@ -41,15 +40,6 @@ function MainKmlApp() {
   const [distressPredictionOpening, setDistressPredictionOpening] = useState(false);
   const [distressError, setDistressError] = useState('');
   const [distressResults, setDistressResults] = useState(null);
-  const [distressSummary, setDistressSummary] = useState(null);
-  const [distressStatus, setDistressStatus] = useState({
-    status: "idle",
-    totalImages: 0,
-    queuedImages: 0,
-    processingImages: 0,
-    processedImages: 0,
-    failedImages: 0,
-  });
   const mapRef = useRef();
   const DISTRESS_PREDICTION_URL = 'https://distress-prediction.onrender.com/';
   /** Max length for pipelineImages JSON in query string (browser URL limits). */
@@ -132,30 +122,6 @@ function MainKmlApp() {
         }
       });
   }, [token, user?.username]);
-
-  useEffect(() => {
-    if (!user?.username || showLanding) return undefined;
-    let cancelled = false;
-    const fetchStatus = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/distress-status`, {
-          headers: apiHeaders(token, user.username),
-        });
-        const data = await response.json();
-        if (!cancelled && data && data.success && data.run) {
-          setDistressStatus(data.run);
-        }
-      } catch (_) {
-        // Keep UI usable even if status polling fails temporarily.
-      }
-    };
-    void fetchStatus();
-    const id = setInterval(fetchStatus, 2000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [token, user?.username, showLanding]);
 
   if (authLoading) {
     return <div className="loading-screen">Loading...</div>;
@@ -287,24 +253,20 @@ function MainKmlApp() {
     if (mapRef.current) {
       await mapRef.current.handleClearAll(true);
     }
-    setDistressStatus({
-      status: "idle",
-      totalImages: 0,
-      queuedImages: 0,
-      processingImages: 0,
-      processedImages: 0,
-      failedImages: 0,
-    });
   };
 
   const handleGetDistressData = async () => {
     setDistressLoading(true);
     setDistressError('');
-    setDistressSummary(null);
     try {
-      const response = await fetch(`${API_URL}/api/distress-data`, {
-        method: 'GET',
-        headers: apiHeaders(token, user?.username),
+      const response = await fetch(`${API_URL}/api/distress-imagewise`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...apiHeaders(token, user?.username),
+        },
+        // Empty body means backend auto-picks merged rotated images from *_kml_merge_images.
+        body: JSON.stringify({}),
       });
       const raw = await response.text();
       let payload = {};
@@ -324,21 +286,10 @@ function MainKmlApp() {
             `Failed to get distress data (${response.status})`
         );
       }
-      const resultsByImage = payload?.resultsByImage || payload?.results_by_image;
-      if (!resultsByImage || typeof resultsByImage !== 'object') {
+      if (!payload || typeof payload.results_by_image !== 'object') {
         throw new Error('Invalid distress response format');
       }
-      const entries = Object.entries(resultsByImage);
-      let defectRows = 0;
-      for (const [, imageData] of entries) {
-        const defects = Array.isArray(imageData?.defects) ? imageData.defects : [];
-        defectRows += defects.length;
-      }
-      setDistressSummary({
-        imageCount: entries.length,
-        defectRows,
-      });
-      setDistressResults(resultsByImage);
+      setDistressResults(payload.results_by_image);
     } catch (error) {
       console.error('Error fetching distress data:', error);
       setDistressError(error.message || 'Failed to fetch distress data');
@@ -461,70 +412,15 @@ function MainKmlApp() {
   const handleDownloadDistressExcel = () => {
     if (!distressResults) return;
     const csv = buildDistressCsv(distressResults);
-    const lines = csv.split('\n').filter((line) => line.length > 0);
-    if (!lines.length) return;
-
-    const parseCsvLine = (line) => {
-      const out = [];
-      let current = '';
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i += 1) {
-        const ch = line[i];
-        if (ch === '"') {
-          if (inQuotes && line[i + 1] === '"') {
-            current += '"';
-            i += 1;
-          } else {
-            inQuotes = !inQuotes;
-          }
-        } else if (ch === ',' && !inQuotes) {
-          out.push(current);
-          current = '';
-        } else {
-          current += ch;
-        }
-      }
-      out.push(current);
-      return out;
-    };
-
-    const rows = lines.map(parseCsvLine);
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Distress');
-
-    const extractChainageRange = (value) => {
-      const text = String(value || '');
-      // Supports formats like:
-      // Chainage_0.100_to_0.200.png
-      // chainage-0.100-to-0.200
-      // Chainage 0.100 to 0.200
-      const match = text.match(
-        /chainage[\s_-]*(\d+(?:\.\d+)?)[\s_-]*to[\s_-]*(\d+(?:\.\d+)?)/i
-      );
-      if (!match) return null;
-      const start = Number(match[1]);
-      const end = Number(match[2]);
-      if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-      return { start, end };
-    };
-    let minStart = Number.POSITIVE_INFINITY;
-    let maxEnd = Number.NEGATIVE_INFINITY;
-    Object.entries(distressResults).forEach(([imageName, imageData]) => {
-      const fromName = extractChainageRange(imageName);
-      const fromRunId = extractChainageRange(imageData?.run_id);
-      const range = fromName || fromRunId;
-      if (!range) return;
-      if (range.start < minStart) minStart = range.start;
-      if (range.end > maxEnd) maxEnd = range.end;
-    });
-    const format3 = (n) => Number(n).toFixed(3);
-    const filename =
-      Number.isFinite(minStart) && Number.isFinite(maxEnd)
-        ? `Chainage_${format3(minStart)}_to_${format3(maxEnd)}.xlsx`
-        : `distress_results_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.xlsx`;
-
-    XLSX.writeFile(wb, filename);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `distress_results_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   /**
@@ -578,15 +474,6 @@ function MainKmlApp() {
     const targetUrl = `${DISTRESS_PREDICTION_URL}?${params.toString()}`;
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };
-
-  const runIsActive =
-    distressStatus.status === "running" || distressStatus.status === "starting";
-  const runIsDone = distressStatus.status === "completed";
-  const getButtonLabel = distressLoading
-    ? "Getting..."
-    : runIsActive
-      ? `Getting... ${distressStatus.processedImages}/${distressStatus.totalImages || "?"}`
-      : "Get Distress Data";
 
   return (
     <div className="App">
@@ -753,10 +640,9 @@ function MainKmlApp() {
               type="button"
               className="distress-action-button"
               onClick={handleGetDistressData}
-              disabled={!runIsDone || distressLoading}
-              title={runIsDone ? "Open image-wise distress data" : "Available after image processing completes"}
+              disabled={distressLoading}
             >
-              {getButtonLabel}
+              {distressLoading ? 'Getting...' : 'Get Distress Data'}
             </button>
             <button
               type="button"
@@ -816,17 +702,9 @@ function MainKmlApp() {
               {distressError ? (
                 <div className="distress-inline-error">{distressError}</div>
               ) : (
-                <div className="distress-response-json">
-                  <p>
-                    <strong>Images processed:</strong> {distressSummary?.imageCount ?? Object.keys(distressResults || {}).length}
-                  </p>
-                  <p>
-                    <strong>Total defect rows:</strong> {distressSummary?.defectRows ?? 0}
-                  </p>
-                  <p style={{ opacity: 0.8 }}>
-                    Detailed per-image output is loaded and ready. Use <strong>Download Excel</strong> for full data.
-                  </p>
-                </div>
+                <pre className="distress-response-json">
+                  {JSON.stringify({ results_by_image: distressResults || {} }, null, 2)}
+                </pre>
               )}
             </div>
           </div>
