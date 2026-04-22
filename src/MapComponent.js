@@ -1,6 +1,5 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, GeoJSON, FeatureGroup, useMap, LayersControl } from 'react-leaflet';
-import { EditControl } from "react-leaflet-draw";
 import { GeoSearchControl, OpenStreetMapProvider } from 'leaflet-geosearch';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
@@ -114,6 +113,57 @@ const SearchControl = ({ visible }) => {
       }
     }
   }, [visible]);
+
+  return null;
+};
+
+const DrawToolbar = ({ featureGroupRef, onCreated, onEdited, onDeleted }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || !featureGroupRef.current) return undefined;
+
+    const drawnLayerGroup = featureGroupRef.current;
+    const drawControl = new L.Control.Draw({
+      position: 'topleft',
+      edit: {
+        featureGroup: drawnLayerGroup,
+        edit: true,
+        remove: true,
+      },
+      draw: {
+        rectangle: false,
+        circle: false,
+        circlemarker: false,
+        marker: true,
+        polyline: {
+          metric: true,
+          showLength: true,
+          precision: 2,
+        },
+        polygon: true,
+      },
+    });
+
+    const handleCreated = (event) => {
+      drawnLayerGroup.addLayer(event.layer);
+      onCreated(event);
+    };
+    const handleEdited = (event) => onEdited(event);
+    const handleDeleted = (event) => onDeleted(event);
+
+    map.addControl(drawControl);
+    map.on(L.Draw.Event.CREATED, handleCreated);
+    map.on(L.Draw.Event.EDITED, handleEdited);
+    map.on(L.Draw.Event.DELETED, handleDeleted);
+
+    return () => {
+      map.off(L.Draw.Event.CREATED, handleCreated);
+      map.off(L.Draw.Event.EDITED, handleEdited);
+      map.off(L.Draw.Event.DELETED, handleDeleted);
+      map.removeControl(drawControl);
+    };
+  }, [map, featureGroupRef, onCreated, onEdited, onDeleted]);
 
   return null;
 };
@@ -576,23 +626,11 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
           </LayersControl.BaseLayer>
         </LayersControl>
         <FeatureGroup ref={featureGroupRef}>
-          <EditControl
-            position='topleft'
-            onEdited={_onEdited}
+          <DrawToolbar
+            featureGroupRef={featureGroupRef}
             onCreated={_onCreated}
+            onEdited={_onEdited}
             onDeleted={_onDeleted}
-            draw={{
-              rectangle: false,
-              circle: false,
-              circlemarker: false,
-              marker: true,
-              polyline: {
-                metric: true,
-                showLength: true,
-                precision: 2
-              },
-              polygon: true,
-            }}
           />
         </FeatureGroup>
         <Marker position={position}>
