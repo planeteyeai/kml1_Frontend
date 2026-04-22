@@ -18,6 +18,7 @@ import {
   Route,
   useNavigate,
 } from "react-router-dom";
+import * as XLSX from "xlsx";
 
 const getLocalDraftKey = (username) => `kml_local_draft_${username || "anonymous"}`;
 
@@ -40,6 +41,7 @@ function MainKmlApp() {
   const [distressPredictionOpening, setDistressPredictionOpening] = useState(false);
   const [distressError, setDistressError] = useState('');
   const [distressResults, setDistressResults] = useState(null);
+  const [distressSummary, setDistressSummary] = useState(null);
   const [distressStatus, setDistressStatus] = useState({
     status: "idle",
     totalImages: 0,
@@ -298,6 +300,7 @@ function MainKmlApp() {
   const handleGetDistressData = async () => {
     setDistressLoading(true);
     setDistressError('');
+    setDistressSummary(null);
     try {
       const response = await fetch(`${API_URL}/api/distress-data`, {
         method: 'GET',
@@ -325,6 +328,16 @@ function MainKmlApp() {
       if (!resultsByImage || typeof resultsByImage !== 'object') {
         throw new Error('Invalid distress response format');
       }
+      const entries = Object.entries(resultsByImage);
+      let defectRows = 0;
+      for (const [, imageData] of entries) {
+        const defects = Array.isArray(imageData?.defects) ? imageData.defects : [];
+        defectRows += defects.length;
+      }
+      setDistressSummary({
+        imageCount: entries.length,
+        defectRows,
+      });
       setDistressResults(resultsByImage);
     } catch (error) {
       console.error('Error fetching distress data:', error);
@@ -448,15 +461,56 @@ function MainKmlApp() {
   const handleDownloadDistressExcel = () => {
     if (!distressResults) return;
     const csv = buildDistressCsv(distressResults);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `distress_results_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const lines = csv.split('\n').filter((line) => line.length > 0);
+    if (!lines.length) return;
+
+    const parseCsvLine = (line) => {
+      const out = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i += 1) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i += 1;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === ',' && !inQuotes) {
+          out.push(current);
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      out.push(current);
+      return out;
+    };
+
+    const rows = lines.map(parseCsvLine);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Distress');
+
+    const chainageRegex = /chainage_(\d+(?:\.\d+)?)_to_(\d+(?:\.\d+)?)/i;
+    let minStart = Number.POSITIVE_INFINITY;
+    let maxEnd = Number.NEGATIVE_INFINITY;
+    Object.keys(distressResults).forEach((imageName) => {
+      const match = String(imageName || '').match(chainageRegex);
+      if (!match) return;
+      const s = Number(match[1]);
+      const e = Number(match[2]);
+      if (Number.isFinite(s) && s < minStart) minStart = s;
+      if (Number.isFinite(e) && e > maxEnd) maxEnd = e;
+    });
+    const format3 = (n) => Number(n).toFixed(3);
+    const filename =
+      Number.isFinite(minStart) && Number.isFinite(maxEnd)
+        ? `Chainage_${format3(minStart)}_to_${format3(maxEnd)}.xlsx`
+        : `distress_results_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.xlsx`;
+
+    XLSX.writeFile(wb, filename);
   };
 
   /**
@@ -509,7 +563,6 @@ function MainKmlApp() {
 
     const targetUrl = `${DISTRESS_PREDICTION_URL}?${params.toString()}`;
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
-  };
   };
 
   const runIsActive =
@@ -749,9 +802,17 @@ function MainKmlApp() {
               {distressError ? (
                 <div className="distress-inline-error">{distressError}</div>
               ) : (
-                <pre className="distress-response-json">
-                  {JSON.stringify({ results_by_image: distressResults || {} }, null, 2)}
-                </pre>
+                <div className="distress-response-json">
+                  <p>
+                    <strong>Images processed:</strong> {distressSummary?.imageCount ?? Object.keys(distressResults || {}).length}
+                  </p>
+                  <p>
+                    <strong>Total defect rows:</strong> {distressSummary?.defectRows ?? 0}
+                  </p>
+                  <p style={{ opacity: 0.8 }}>
+                    Detailed per-image output is loaded and ready. Use <strong>Download Excel</strong> for full data.
+                  </p>
+                </div>
               )}
             </div>
           </div>
