@@ -253,6 +253,32 @@
   font-size: 0.8rem;
 }
 
+.cards-section--kml .distress-data-button,
+.cards-section--kml .distress-prediction-button {
+  margin-top: 5px;
+  width: 100%;
+  padding: 6px 10px;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.cards-section--kml .distress-data-button {
+  background: linear-gradient(135deg, #0e9f6e, #0f766e);
+}
+
+.cards-section--kml .distress-data-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.cards-section--kml .distress-prediction-button {
+  background: linear-gradient(135deg, #0e9f6e, #059669);
+}
+
 .cards-section--kml .kml-pipeline-link-wrap {
   margin-top: 6px;
   text-align: center;

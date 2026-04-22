@@ -40,6 +40,14 @@ function MainKmlApp() {
   const [distressPredictionOpening, setDistressPredictionOpening] = useState(false);
   const [distressError, setDistressError] = useState('');
   const [distressResults, setDistressResults] = useState(null);
+  const [distressStatus, setDistressStatus] = useState({
+    status: "idle",
+    totalImages: 0,
+    queuedImages: 0,
+    processingImages: 0,
+    processedImages: 0,
+    failedImages: 0,
+  });
   const mapRef = useRef();
   const DISTRESS_PREDICTION_URL = 'https://distress-prediction.onrender.com/';
   /** Max length for pipelineImages JSON in query string (browser URL limits). */
@@ -122,6 +130,30 @@ function MainKmlApp() {
         }
       });
   }, [token, user?.username]);
+
+  useEffect(() => {
+    if (!user?.username || showLanding) return undefined;
+    let cancelled = false;
+    const fetchStatus = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/distress-status`, {
+          headers: apiHeaders(token, user.username),
+        });
+        const data = await response.json();
+        if (!cancelled && data && data.success && data.run) {
+          setDistressStatus(data.run);
+        }
+      } catch (_) {
+        // Keep UI usable even if status polling fails temporarily.
+      }
+    };
+    void fetchStatus();
+    const id = setInterval(fetchStatus, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [token, user?.username, showLanding]);
 
   if (authLoading) {
     return <div className="loading-screen">Loading...</div>;
@@ -253,20 +285,23 @@ function MainKmlApp() {
     if (mapRef.current) {
       await mapRef.current.handleClearAll(true);
     }
+    setDistressStatus({
+      status: "idle",
+      totalImages: 0,
+      queuedImages: 0,
+      processingImages: 0,
+      processedImages: 0,
+      failedImages: 0,
+    });
   };
 
   const handleGetDistressData = async () => {
     setDistressLoading(true);
     setDistressError('');
     try {
-      const response = await fetch(`${API_URL}/api/distress-imagewise`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...apiHeaders(token, user?.username),
-        },
-        // Empty body means backend auto-picks merged rotated images from *_kml_merge_images.
-        body: JSON.stringify({}),
+      const response = await fetch(`${API_URL}/api/distress-data`, {
+        method: 'GET',
+        headers: apiHeaders(token, user?.username),
       });
       const raw = await response.text();
       let payload = {};
@@ -286,10 +321,11 @@ function MainKmlApp() {
             `Failed to get distress data (${response.status})`
         );
       }
-      if (!payload || typeof payload.results_by_image !== 'object') {
+      const resultsByImage = payload?.resultsByImage || payload?.results_by_image;
+      if (!resultsByImage || typeof resultsByImage !== 'object') {
         throw new Error('Invalid distress response format');
       }
-      setDistressResults(payload.results_by_image);
+      setDistressResults(resultsByImage);
     } catch (error) {
       console.error('Error fetching distress data:', error);
       setDistressError(error.message || 'Failed to fetch distress data');
@@ -474,6 +510,16 @@ function MainKmlApp() {
     const targetUrl = `${DISTRESS_PREDICTION_URL}?${params.toString()}`;
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };
+  };
+
+  const runIsActive =
+    distressStatus.status === "running" || distressStatus.status === "starting";
+  const runIsDone = distressStatus.status === "completed";
+  const getButtonLabel = distressLoading
+    ? "Getting..."
+    : runIsActive
+      ? `Getting... ${distressStatus.processedImages}/${distressStatus.totalImages || "?"}`
+      : "Get Distress Data";
 
   return (
     <div className="App">
@@ -640,9 +686,10 @@ function MainKmlApp() {
               type="button"
               className="distress-action-button"
               onClick={handleGetDistressData}
-              disabled={distressLoading}
+              disabled={!runIsDone || distressLoading}
+              title={runIsDone ? "Open image-wise distress data" : "Available after image processing completes"}
             >
-              {distressLoading ? 'Getting...' : 'Get Distress Data'}
+              {getButtonLabel}
             </button>
             <button
               type="button"

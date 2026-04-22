@@ -8,11 +8,33 @@ import 'leaflet-geosearch/dist/geosearch.css';
 import L from 'leaflet';
 import 'leaflet-draw'; // Force load GeometryUtil
 import { kml } from "@tmcw/togeojson";
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 import API_URL from './config';
 import { apiHeaders } from './apiHeaders';
 import { useAuth } from './AuthContext';
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+import {
+  cacheMergeImagesFromServer,
+  clearPipelineImageCache,
+} from './pipelineImageCache';
+
+async function refreshPipelineImageCache(mergeImages, token, username) {
+  try {
+    let imgs = mergeImages;
+    if (!imgs || imgs.length === 0) {
+      const base = (API_URL || '').replace(/\/+$/, '');
+      const path = `/api/merge-images/${encodeURIComponent((username || 'local-user').trim())}`;
+      const url = base ? `${base}${path}` : `${window.location.origin}${path}`;
+      const mr = await fetch(url, { headers: apiHeaders(token, username) });
+      const md = await mr.json();
+      if (md.success && md.images) imgs = md.images;
+    }
+    const r = await cacheMergeImagesFromServer(imgs, username, token);
+    console.log(`[pipelineImageCache] stored ${r.count} image(s) for offline/compute`);
+  } catch (e) {
+    console.warn('[pipelineImageCache]', e);
+  }
+}
 
 // Global override for Leaflet distance formatting
 const applyDistanceOverride = () => {
@@ -153,7 +175,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
   const [geoJsonData, setGeoJsonData] = useState(null);
   const [dataKey, setDataKey] = useState(0);
   const [isDataVisible, setIsDataVisible] = useState(false);
-  const [drawnFeatures, setDrawnFeatures] = useState([]);
+  const [, setDrawnFeatures] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState({ show: false, message: '', type: '' });
   const featureGroupRef = React.useRef(null);
@@ -211,10 +233,11 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
       .then(response => response.json())
       .then(data => {
         if (data.success) {
-          console.log("File uploaded successfully to:", data.path);
+          console.log("File uploaded successfully to:", data.pipelinePath);
           if (onSaveSuccess && data.pipelinePath) {
             onSaveSuccess(data.pipelinePath);
           }
+          void refreshPipelineImageCache(data.mergeImages, token, user?.username);
         } else {
           console.error("Upload failed:", data.message);
         }
@@ -328,19 +351,17 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
         if (onSaveSuccess && result.pipelinePath) {
           onSaveSuccess(result.pipelinePath);
         }
+        void refreshPipelineImageCache(result.mergeImages, token, user?.username);
         // Auto-hide success message after 3 seconds
         setTimeout(() => setSaveStatus(prev => ({ ...prev, show: false })), 3000);
       } else {
         const savedLocally = saveDraftLocally(payload);
-        const detailText =
-          result && typeof result.details === "string" && result.details.trim()
-            ? ` Details: ${result.details}`
-            : "";
+        const detail = result.details ? ` ${String(result.details)}` : '';
         setSaveStatus({
           show: true,
           message: savedLocally
-            ? `Server save failed (${result.message || 'unknown error'}).${detailText} Draft saved locally on this device.`
-            : 'Error saving data: ' + (result.message || 'Unknown error') + detailText,
+            ? `Server save failed (${result.message || 'unknown error'}).${detail} Draft saved locally on this device.`
+            : 'Error saving data: ' + (result.message || 'Unknown error') + detail,
           type: savedLocally ? 'success' : 'error'
         });
       }
@@ -373,6 +394,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
       
       const result = await response.json();
       if (result.success) {
+        void clearPipelineImageCache(user?.username);
         // 2. Clear local map layers
         if (featureGroupRef.current) {
           featureGroupRef.current.clearLayers();
