@@ -1042,6 +1042,11 @@
   border-bottom: 1px solid rgba(0,0,0,0.1) !important;
 }
 
+/* Keep draw controls clickable above upload/download overlays. */
+.leaflet-top.leaflet-left .leaflet-control {
+  z-index: 1400 !important;
+}
+
 .leaflet-draw-toolbar a:hover,
 .leaflet-control-layers-toggle:hover {
   background-color: #ABA8A4 !important; /* Inverts to #54575b */
