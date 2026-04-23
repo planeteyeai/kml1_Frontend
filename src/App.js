@@ -37,13 +37,10 @@ function MainKmlApp() {
   const [pipelineInitialPath, setPipelineInitialPath] = useState('');
   const [initialGeoJson, setInitialGeoJson] = useState(null);
   const [distressLoading, setDistressLoading] = useState(false);
-  const [distressPredictionOpening, setDistressPredictionOpening] = useState(false);
   const [distressError, setDistressError] = useState('');
   const [distressResults, setDistressResults] = useState(null);
   const mapRef = useRef();
   const DISTRESS_PREDICTION_URL = 'https://distress-prediction.onrender.com/';
-  /** Max length for pipelineImages JSON in query string (browser URL limits). */
-  const MAX_PIPELINE_IMAGES_QUERY_CHARS = 1800;
 
   // Load last saved data on mount; fallback to local draft when server is unavailable.
   useEffect(() => {
@@ -423,54 +420,11 @@ function MainKmlApp() {
     URL.revokeObjectURL(url);
   };
 
-  /**
-   * Opens RoadScan / distress-prediction with auth plus pipeline image metadata.
-   * RoadScan can either read `pipelineImages` (JSON array) or call:
-   *   GET {kmlApiBase}/api/merge-images/{username}?only=merge_kml
-   * with Authorization: Bearer {token} and x-username header.
-   */
-  const handleOpenDistressPrediction = async () => {
-    if (!user?.username) return;
-    const apiBase = String(API_URL || '').replace(/\/+$/, '');
+  const handleOpenDistressPrediction = () => {
     const params = new URLSearchParams();
-    params.set('username', user.username);
+    if (user?.username) params.set('username', user.username);
     if (token) params.set('token', token);
     params.set('source', 'kml-tools');
-    if (apiBase) params.set('kmlApiBase', apiBase);
-
-    setDistressPredictionOpening(true);
-    try {
-      const fetchMergeList = async (only) => {
-        const q = only ? `?only=${encodeURIComponent(only)}` : '';
-        const baseForFetch = apiBase || '';
-        const res = await fetch(`${baseForFetch}/api/merge-images/${encodeURIComponent(user.username)}${q}`, {
-          headers: { Accept: 'application/json', ...apiHeaders(token, user.username) },
-        });
-        if (!res.ok) return [];
-        const data = await res.json().catch(() => ({}));
-        if (!data.success || !Array.isArray(data.images)) return [];
-        return data.images;
-      };
-
-      let images = await fetchMergeList('merge_kml');
-      if (!images.length) images = await fetchMergeList('');
-      const slim = images.map((img) => ({
-        side: img.side,
-        lane: img.lane,
-        fileName: img.fileName,
-        publicUrl: img.publicUrl,
-      }));
-      params.set('pipelineImageCount', String(slim.length));
-      const json = JSON.stringify(slim);
-      if (json.length > 0 && json.length <= MAX_PIPELINE_IMAGES_QUERY_CHARS) {
-        params.set('pipelineImages', json);
-      }
-    } catch (e) {
-      console.warn('Distress prediction: could not load pipeline images', e);
-    } finally {
-      setDistressPredictionOpening(false);
-    }
-
     const targetUrl = `${DISTRESS_PREDICTION_URL}?${params.toString()}`;
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };
@@ -648,9 +602,8 @@ function MainKmlApp() {
               type="button"
               className="distress-action-button"
               onClick={handleOpenDistressPrediction}
-              disabled={distressPredictionOpening}
             >
-              {distressPredictionOpening ? 'Opening…' : 'Distress Prediction'}
+              Distress Prediction
             </button>
             <div className="kml-pipeline-link-wrap">
               <button
