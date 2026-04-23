@@ -4,7 +4,7 @@ import MapComponent from "./MapComponent";
 import PipelineView from "./PipelineView";
 import Login from "./Login";
 import { useAuth } from "./AuthContext";
-import API_URL from "./config";
+import API_URL, { HOSTED_DISTRESS_BATCH_URL } from "./config";
 import { apiHeaders } from "./apiHeaders";
 import DistressReport from "./DistressReport";
 import DistressPredicted from "./DistressPredicted";
@@ -256,14 +256,58 @@ function MainKmlApp() {
     setDistressLoading(true);
     setDistressError('');
     try {
-      const response = await fetch(`${API_URL}/api/distress-imagewise`, {
+      const listResponse = await fetch(
+        `${API_URL}/api/merge-images/${encodeURIComponent(user?.username || '')}?only=merge_kml`,
+        {
+          headers: apiHeaders(token, user?.username),
+        }
+      );
+      const listPayload = await listResponse.json();
+      if (!listResponse.ok) {
+        throw new Error(
+          listPayload?.message ||
+            listPayload?.error ||
+            `Failed to list merged images (${listResponse.status})`
+        );
+      }
+
+      const images = Array.isArray(listPayload?.images) ? listPayload.images : [];
+      if (images.length === 0) {
+        throw new Error(
+          listPayload?.hint ||
+            'No merged images found. Please run Save Data first.'
+        );
+      }
+
+      const fileBlobs = await Promise.all(
+        images.map(async (image) => {
+          const imageUrl = image?.publicUrl || image?.url;
+          if (!imageUrl) {
+            throw new Error(`Image URL missing for ${image?.fileName || 'unknown file'}`);
+          }
+          const imgRes = await fetch(imageUrl, {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          });
+          if (!imgRes.ok) {
+            throw new Error(
+              `Failed to fetch image ${image?.fileName || ''} (${imgRes.status})`
+            );
+          }
+          return {
+            fileName: image?.fileName || `image_${Date.now()}.png`,
+            blob: await imgRes.blob(),
+          };
+        })
+      );
+
+      const formData = new FormData();
+      fileBlobs.forEach(({ fileName, blob }) => {
+        formData.append('files', blob, fileName);
+      });
+
+      const response = await fetch(HOSTED_DISTRESS_BATCH_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...apiHeaders(token, user?.username),
-        },
-        // Empty body means backend auto-picks merged rotated images from *_kml_merge_images.
-        body: JSON.stringify({}),
+        body: formData,
       });
       const raw = await response.text();
       let payload = {};
