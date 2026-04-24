@@ -765,55 +765,26 @@ function MainKmlApp() {
     if (!distressResults) return;
     let reportedRows = buildDistressTemplateRows(distressResults);
     let predictedRows = buildPredictedTemplateRows(distressResults);
-    if (!reportedRows.length && !predictedRows.length) {
-      // Fallback: keep export non-empty when API returns defects with unexpected type labels.
-      const fallbackRows = [];
-      Object.entries(distressResults || {}).forEach(([imageName, imageData]) => {
-        const parsed = parseChainageFromImageName(imageName);
-        const defects = Array.isArray(imageData?.defects) ? imageData.defects : [];
-        defects.forEach((defect) => {
-          const distressType = normalizeDefectType(defect?.type) || inferDistressType(defect);
-          const indicators = getIndicatorValues(distressType);
-          const start = Number.isFinite(Number(defect?.start))
-            ? Number(defect.start)
-            : parsed?.start ?? "";
-          const end = Number.isFinite(Number(defect?.end))
-            ? Number(defect.end)
-            : parsed?.end ?? "";
-          const sideValue = defect?.side || parsed?.side || "";
-          const direction = inferDirectionFromSide(sideValue);
-          fallbackRows.push({
-            Latitude: defect?.latitude ?? "",
-            Longitude: defect?.longitude ?? "",
-            "Project Name": projectName || "",
-            "Chainage Start": start,
-            "Chainage End": end,
-            "Total Distress": 1,
-            "Distress Type": distressType,
-            Pothole: indicators.pothole,
-            "Alligator crack": indicators.alligator,
-            "Block crack/Oblique crack": indicators.blockOblique,
-            "Edge Break": indicators.edgeBreak,
-            Patchwork: indicators.patchwork,
-            Bleeding: indicators.bleeding,
-            Hotspots: indicators.hotspots,
-            Rutting: indicators.rutting,
-            Raveling: indicators.raveling,
-            "Transverse crack": indicators.transverse,
-            "Rough Spot": indicators.roughSpot,
-            Direction: direction,
-            Lane: sideValue,
-            Date: new Date().toISOString().slice(0, 10).split("-").reverse().join("-"),
-            "Carriage Type": "Flexible",
-            "Hairline crack": indicators.hairline,
-            "Longitudinal crack": indicators.longitudinal,
-          });
-        });
-      });
-      predictedRows = fallbackRows;
+    if (!reportedRows.length) {
+      reportedRows = buildNoDefectFallbackRows(distressResults, "reported");
+    }
+    if (!predictedRows.length) {
+      predictedRows = buildNoDefectFallbackRows(distressResults, "predicted");
     }
     const baseName = getExportBaseName(distressResults);
-    downloadWorkbook(reportedRows, predictedRows, `${baseName}_distress.xlsx`);
+    // Single click downloads both files the user expects.
+    downloadSingleSheetWorkbook(
+      reportedRows,
+      DISTRESS_TEMPLATE_HEADERS,
+      "Reported",
+      `${baseName}_reported.xlsx`
+    );
+    downloadSingleSheetWorkbook(
+      predictedRows,
+      PREDICTED_TEMPLATE_HEADERS,
+      "Predicted",
+      `${baseName}_predicted.xlsx`
+    );
   };
 
   const handleDownloadReportedExcel = () => {
