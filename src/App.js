@@ -419,13 +419,6 @@ function MainKmlApp() {
     const val = Number(n);
     return Number.isFinite(val) ? val.toFixed(3) : "0.000";
   };
-  const isSameChainage = (start, end) => {
-    const s = Number(start);
-    const e = Number(end);
-    if (!Number.isFinite(s) || !Number.isFinite(e)) return false;
-    return Math.abs(s - e) < 1e-9;
-  };
-
   const inferDirectionFromSide = (sideValue) => {
     const side = String(sideValue || "").trim().toUpperCase();
     if (side === "LHS") return "Increasing";
@@ -512,7 +505,6 @@ function MainKmlApp() {
         const end = Number.isFinite(Number(defect?.end))
           ? Number(defect.end)
           : parsed?.end ?? "";
-        if (isSameChainage(start, end)) return;
         const length = Number.isFinite(Number(defect?.length)) ? Number(defect.length) : 0;
         const width = Number.isFinite(Number(defect?.width)) ? Number(defect.width) : 0;
         const depth = Number.isFinite(Number(defect?.max_depth))
@@ -592,7 +584,6 @@ function MainKmlApp() {
         const end = Number.isFinite(Number(defect?.end))
           ? Number(defect.end)
           : parsed?.end ?? "";
-        if (isSameChainage(start, end)) return;
         const sideValue = defect?.side || parsed?.side || "";
         const direction = inferDirectionFromSide(sideValue);
         rows.push({
@@ -663,8 +654,55 @@ function MainKmlApp() {
 
   const handleDownloadDistressExcel = () => {
     if (!distressResults) return;
-    const reportedRows = buildDistressTemplateRows(distressResults);
-    const predictedRows = buildPredictedTemplateRows(distressResults);
+    let reportedRows = buildDistressTemplateRows(distressResults);
+    let predictedRows = buildPredictedTemplateRows(distressResults);
+    if (!reportedRows.length && !predictedRows.length) {
+      // Fallback: keep export non-empty when API returns defects with unexpected type labels.
+      const fallbackRows = [];
+      Object.entries(distressResults || {}).forEach(([imageName, imageData]) => {
+        const parsed = parseChainageFromImageName(imageName);
+        const defects = Array.isArray(imageData?.defects) ? imageData.defects : [];
+        defects.forEach((defect) => {
+          const distressType = normalizeDefectType(defect?.type) || inferDistressType(defect);
+          const indicators = getIndicatorValues(distressType);
+          const start = Number.isFinite(Number(defect?.start))
+            ? Number(defect.start)
+            : parsed?.start ?? "";
+          const end = Number.isFinite(Number(defect?.end))
+            ? Number(defect.end)
+            : parsed?.end ?? "";
+          const sideValue = defect?.side || parsed?.side || "";
+          const direction = inferDirectionFromSide(sideValue);
+          fallbackRows.push({
+            Latitude: defect?.latitude ?? "",
+            Longitude: defect?.longitude ?? "",
+            "Project Name": projectName || "",
+            "Chainage Start": start,
+            "Chainage End": end,
+            "Total Distress": 1,
+            "Distress Type": distressType,
+            Pothole: indicators.pothole,
+            "Alligator crack": indicators.alligator,
+            "Block crack/Oblique crack": indicators.blockOblique,
+            "Edge Break": indicators.edgeBreak,
+            Patchwork: indicators.patchwork,
+            Bleeding: indicators.bleeding,
+            Hotspots: indicators.hotspots,
+            Rutting: indicators.rutting,
+            Raveling: indicators.raveling,
+            "Transverse crack": indicators.transverse,
+            "Rough Spot": indicators.roughSpot,
+            Direction: direction,
+            Lane: sideValue,
+            Date: new Date().toISOString().slice(0, 10).split("-").reverse().join("-"),
+            "Carriage Type": "Flexible",
+            "Hairline crack": indicators.hairline,
+            "Longitudinal crack": indicators.longitudinal,
+          });
+        });
+      });
+      predictedRows = fallbackRows;
+    }
     const baseName = getExportBaseName(distressResults);
     downloadWorkbook(reportedRows, predictedRows, `${baseName}_distress.xlsx`);
   };
