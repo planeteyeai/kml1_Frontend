@@ -626,7 +626,7 @@ function MainKmlApp() {
     return rows;
   };
 
-  const downloadWorkbook = (rows, headers, fileName) => {
+  const buildWorksheet = (rows, headers) => {
     const orderedRows = rows.map((row) => {
       const out = {};
       headers.forEach((header) => {
@@ -634,11 +634,19 @@ function MainKmlApp() {
       });
       return out;
     });
-    const worksheet = orderedRows.length
-      ? XLSX.utils.json_to_sheet(orderedRows, { header: headers })
-      : XLSX.utils.aoa_to_sheet([headers]);
+    if (!orderedRows.length) {
+      // Keep a header-only sheet when no data rows are present.
+      return XLSX.utils.aoa_to_sheet([headers]);
+    }
+    return XLSX.utils.json_to_sheet(orderedRows, { header: headers });
+  };
+
+  const downloadWorkbook = (reportedRows, predictedRows, fileName) => {
+    const reportedSheet = buildWorksheet(reportedRows, DISTRESS_TEMPLATE_HEADERS);
+    const predictedSheet = buildWorksheet(predictedRows, PREDICTED_TEMPLATE_HEADERS);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+    XLSX.utils.book_append_sheet(workbook, reportedSheet, "Reported");
+    XLSX.utils.book_append_sheet(workbook, predictedSheet, "Predicted");
     const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
     const blob = new Blob([buffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -658,19 +666,7 @@ function MainKmlApp() {
     const reportedRows = buildDistressTemplateRows(distressResults);
     const predictedRows = buildPredictedTemplateRows(distressResults);
     const baseName = getExportBaseName(distressResults);
-    downloadWorkbook(
-      reportedRows,
-      DISTRESS_TEMPLATE_HEADERS,
-      `${baseName}_reported.xlsx`
-    );
-    // Trigger second file a moment later to avoid some browsers dropping one download.
-    setTimeout(() => {
-      downloadWorkbook(
-        predictedRows,
-        PREDICTED_TEMPLATE_HEADERS,
-        `${baseName}_predicted.xlsx`
-      );
-    }, 250);
+    downloadWorkbook(reportedRows, predictedRows, `${baseName}_distress.xlsx`);
   };
 
   const handleOpenDistressPrediction = () => {
