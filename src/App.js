@@ -18,8 +18,53 @@ import {
   Route,
   useNavigate,
 } from "react-router-dom";
+import * as XLSX from "xlsx";
 
 const getLocalDraftKey = (username) => `kml_local_draft_${username || "anonymous"}`;
+const DISTRESS_TEMPLATE_HEADERS = [
+  "Latitude",
+  "Longitude",
+  "Chainage Start",
+  "Chainage End",
+  "Project Name",
+  "Distress Type",
+  "Direction",
+  "Lane",
+  "Total Distress",
+  "Pothole",
+  "Edge Break",
+  "Patchwork",
+  "Bleeding",
+  "Hotspots",
+  "Simple crack/Alligator crack",
+  "Rough Spot",
+  "Repair",
+  "Block crack/Oblique crack",
+  "Rutting",
+  "Longitudinal crack/Transverse crack",
+  "Raveling",
+  "Date",
+  "Length",
+  "Area",
+  "Carriage Type ",
+  "Single discrete crack",
+  "Multiple cracks",
+  "Joint crack",
+  "Joint seal defects",
+  "Punchout",
+  "Slippage",
+  "Heaves",
+  "Alligator crack",
+  "Oblique crack",
+  "Transverse crack",
+  "Width",
+  "Depth",
+  "Hairline crack",
+  "Hungry Surface",
+  "Settlement",
+  "Shoving",
+  "Stripping",
+];
 
 function MainKmlApp() {
   const { user, token, logout, loading: authLoading } = useAuth();
@@ -29,6 +74,7 @@ function MainKmlApp() {
   const [offsetType, setOffsetType] = useState('');
   const [laneCount, setLaneCount] = useState('2');
   const [kmlMergeOffset, setKmlMergeOffset] = useState('');
+  const [projectName, setProjectName] = useState('');
   const [startDate, setStartDate] = useState('2026-02-10');
   const [endDate, setEndDate] = useState('2026-02-20');
   const [imageDirection, setImageDirection] = useState('down_to_up');
@@ -58,6 +104,7 @@ function MainKmlApp() {
             setOffsetType(lastEntry.metadata.offsetType || '');
             setLaneCount(lastEntry.metadata.laneCount || '2');
             setKmlMergeOffset(lastEntry.metadata.kmlMergeOffset || '');
+            setProjectName(lastEntry.metadata.projectName || "");
             setStartDate(lastEntry.metadata.startDate || '2026-02-10');
             setEndDate(lastEntry.metadata.endDate || '2026-02-20');
             setImageDirection(lastEntry.metadata.imageDirection || 'down_to_up');
@@ -78,6 +125,7 @@ function MainKmlApp() {
               setOffsetType(draft.metadata.offsetType || '');
               setLaneCount(draft.metadata.laneCount || '2');
               setKmlMergeOffset(draft.metadata.kmlMergeOffset || '');
+              setProjectName(draft.metadata.projectName || "");
               setStartDate(draft.metadata.startDate || '2026-02-10');
               setEndDate(draft.metadata.endDate || '2026-02-20');
               setImageDirection(draft.metadata.imageDirection || 'down_to_up');
@@ -104,6 +152,7 @@ function MainKmlApp() {
             setOffsetType(draft.metadata.offsetType || '');
             setLaneCount(draft.metadata.laneCount || '2');
             setKmlMergeOffset(draft.metadata.kmlMergeOffset || '');
+            setProjectName(draft.metadata.projectName || "");
             setStartDate(draft.metadata.startDate || '2026-02-10');
             setEndDate(draft.metadata.endDate || '2026-02-20');
             setImageDirection(draft.metadata.imageDirection || 'down_to_up');
@@ -242,6 +291,7 @@ function MainKmlApp() {
     setOffsetType('');
     setLaneCount('2');
     setKmlMergeOffset('');
+    setProjectName('');
     setStartDate('2026-02-10');
     setEndDate('2026-02-20');
     setImageDirection('down_to_up');
@@ -295,136 +345,217 @@ function MainKmlApp() {
     }
   };
 
-  const escapeCsv = (value) => {
-    if (value === null || value === undefined) return '';
-    const text = String(value);
-    if (/[",\n]/.test(text)) {
-      return `"${text.replace(/"/g, '""')}"`;
-    }
-    return text;
+  const inferDistressType = (defect = {}) => {
+    const raw = String(defect?.type || "").trim().toLowerCase();
+    if (raw.includes("pothole")) return "Pothole";
+    if (raw.includes("rut")) return "Rutting";
+    if (raw.includes("block")) return "Block crack";
+    if (raw.includes("alligator")) return "Alligator crack";
+    if (raw.includes("transverse")) return "Transverse crack";
+    if (raw.includes("longitudinal")) return "Longitudinal crack";
+    if (raw.includes("oblique")) return "Oblique crack";
+    if (raw.includes("ravel")) return "Raveling";
+    return defect?.type ? String(defect.type) : "Unknown";
   };
 
-  const buildDistressCsv = (resultsByImage) => {
-    const headers = [
-      'image_name',
-      'run_id',
-      'components',
-      'edges',
-      'reported_crack',
-      'predicted_crack',
-      'reported_pothole',
-      'predicted_pothole',
-      'reported_alligator_crack',
-      'predicted_alligator_crack',
-      'defect_id',
-      'defect_type',
-      'severity',
-      'start',
-      'end',
-      'length',
-      'max_depth',
-      'width',
-      'sensors',
-      'confidence',
-      'reported_depth',
-      'reported_width',
-      'total_width',
-      'pothole_area',
-      'side',
-      'latitude',
-      'longitude',
-      'matched_chainage_start_km',
-    ];
+  const parseChainageFromImageName = (name = "") => {
+    const match = String(name || "").match(
+      /Chainage_(\d+(?:\.\d+)?)_to_(\d+(?:\.\d+)?)_([A-Za-z]+)_merged\.(?:png|kml)$/i
+    );
+    if (!match) return null;
+    return {
+      start: Number(match[1]),
+      end: Number(match[2]),
+      side: String(match[3]).toUpperCase(),
+    };
+  };
 
-    const lines = [headers.join(',')];
-    const entries = Object.entries(resultsByImage || {});
+  const toFileProjectName = (name = "") =>
+    String(name || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "project";
 
-    entries.forEach(([imageName, imageData]) => {
-      const counts = imageData?.counts || {};
-      const meta = imageData?.meta || {};
+  const toThree = (n) => {
+    const val = Number(n);
+    return Number.isFinite(val) ? val.toFixed(3) : "0.000";
+  };
+
+  const inferDirectionFromSide = (sideValue) => {
+    const side = String(sideValue || "").trim().toUpperCase();
+    if (side === "LHS") return "Increasing";
+    if (side === "RHS") return "Decreasing";
+    return "";
+  };
+
+  const buildDownloadFilename = (resultsByImage) => {
+    const entries = Object.keys(resultsByImage || {})
+      .map(parseChainageFromImageName)
+      .filter(Boolean);
+    const project = toFileProjectName(projectName);
+    if (!entries.length) {
+      return `${project}_distress.xlsx`;
+    }
+    const minStart = Math.min(...entries.map((x) => x.start));
+    const maxEnd = Math.max(...entries.map((x) => x.end));
+    const sides = [...new Set(entries.map((x) => x.side))];
+    const side = sides.length === 1 ? sides[0] : "BOTH";
+    return `${project}_Chainage_${toThree(minStart)}_to_${toThree(maxEnd)}_${side}.xlsx`;
+  };
+
+  const getIndicatorValues = (distressType) => {
+    const defaults = {
+      pothole: 0,
+      edgeBreak: 0,
+      patchwork: 0,
+      bleeding: 0,
+      hotspots: 0,
+      simpleAlligator: 0,
+      roughSpot: 0,
+      repair: 0,
+      blockOblique: 0,
+      rutting: 0,
+      longTransverse: 0,
+      raveling: 0,
+      alligator: 0,
+      oblique: 0,
+      transverse: 0,
+      hairline: 0,
+      hungrySurface: 0,
+      settlement: 0,
+      shoving: 0,
+      stripping: 0,
+    };
+    const key = String(distressType || "").toLowerCase();
+    if (key.includes("pothole")) defaults.pothole = 1;
+    if (key.includes("edge")) defaults.edgeBreak = 1;
+    if (key.includes("patch")) defaults.patchwork = 1;
+    if (key.includes("bleed")) defaults.bleeding = 1;
+    if (key.includes("hotspot")) defaults.hotspots = 1;
+    if (key.includes("simple")) defaults.simpleAlligator = 1;
+    if (key.includes("rough")) defaults.roughSpot = 1;
+    if (key.includes("repair")) defaults.repair = 1;
+    if (key.includes("block") || key.includes("oblique")) defaults.blockOblique = 1;
+    if (key.includes("rut")) defaults.rutting = 1;
+    if (key.includes("longitudinal") || key.includes("transverse")) defaults.longTransverse = 1;
+    if (key.includes("ravel")) defaults.raveling = 1;
+    if (key.includes("alligator")) defaults.alligator = 1;
+    if (key.includes("oblique")) defaults.oblique = 1;
+    if (key.includes("transverse")) defaults.transverse = 1;
+    if (key.includes("hairline")) defaults.hairline = 1;
+    if (key.includes("hungry")) defaults.hungrySurface = 1;
+    if (key.includes("settlement")) defaults.settlement = 1;
+    if (key.includes("shoving")) defaults.shoving = 1;
+    if (key.includes("stripping")) defaults.stripping = 1;
+    return defaults;
+  };
+
+  const buildDistressTemplateRows = (resultsByImage) => {
+    const rows = [];
+    const today = new Date().toISOString().slice(0, 10).split("-").reverse().join("-");
+    const carriageType = "Flexible";
+    Object.entries(resultsByImage || {}).forEach(([imageName, imageData]) => {
+      const parsed = parseChainageFromImageName(imageName);
       const defects = Array.isArray(imageData?.defects) ? imageData.defects : [];
-
-      if (defects.length === 0) {
-        const row = [
-          imageName,
-          imageData?.run_id || '',
-          meta.components ?? '',
-          meta.edges ?? '',
-          counts.reported_crack ?? 0,
-          counts.predicted_crack ?? 0,
-          counts.reported_pothole ?? 0,
-          counts.predicted_pothole ?? 0,
-          counts.reported_alligator_crack ?? 0,
-          counts.predicted_alligator_crack ?? 0,
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-          '',
-        ];
-        lines.push(row.map(escapeCsv).join(','));
-        return;
-      }
-
       defects.forEach((defect) => {
-        const row = [
-          imageName,
-          imageData?.run_id || '',
-          meta.components ?? '',
-          meta.edges ?? '',
-          counts.reported_crack ?? 0,
-          counts.predicted_crack ?? 0,
-          counts.reported_pothole ?? 0,
-          counts.predicted_pothole ?? 0,
-          counts.reported_alligator_crack ?? 0,
-          counts.predicted_alligator_crack ?? 0,
-          defect?.id ?? '',
-          defect?.type ?? '',
-          defect?.severity ?? '',
-          defect?.start ?? '',
-          defect?.end ?? '',
-          defect?.length ?? '',
-          defect?.max_depth ?? '',
-          defect?.width ?? '',
-          defect?.sensors ?? '',
-          defect?.confidence ?? '',
-          defect?.reported_depth ?? '',
-          defect?.reported_width ?? '',
-          defect?.total_width ?? '',
-          defect?.pothole_area ?? '',
-          defect?.side ?? '',
-          defect?.latitude ?? '',
-          defect?.longitude ?? '',
-          defect?.matched_chainage_start_km ?? '',
-        ];
-        lines.push(row.map(escapeCsv).join(','));
+        const distressType = inferDistressType(defect);
+        const indicators = getIndicatorValues(distressType);
+        const start = Number.isFinite(Number(defect?.start))
+          ? Number(defect.start)
+          : parsed?.start ?? "";
+        const end = Number.isFinite(Number(defect?.end))
+          ? Number(defect.end)
+          : parsed?.end ?? "";
+        const length = Number.isFinite(Number(defect?.length)) ? Number(defect.length) : 0;
+        const width = Number.isFinite(Number(defect?.width)) ? Number(defect.width) : 0;
+        const depth = Number.isFinite(Number(defect?.max_depth))
+          ? Number(defect.max_depth)
+          : Number.isFinite(Number(defect?.reported_depth))
+            ? Number(defect.reported_depth)
+            : 0;
+        const area = Number.isFinite(Number(defect?.pothole_area))
+          ? Number(defect.pothole_area)
+          : Number((length || 0) * (width || 0)).toFixed(3);
+        const sideValue = defect?.side || parsed?.side || "";
+        const direction = inferDirectionFromSide(sideValue);
+        const row = {
+          Latitude: defect?.latitude ?? "",
+          Longitude: defect?.longitude ?? "",
+          "Chainage Start": start,
+          "Chainage End": end,
+          "Project Name": projectName || "",
+          "Distress Type": distressType,
+          Direction: direction,
+          Lane: sideValue,
+          "Total Distress": 1,
+          Pothole: indicators.pothole,
+          "Edge Break": indicators.edgeBreak,
+          Patchwork: indicators.patchwork,
+          Bleeding: indicators.bleeding,
+          Hotspots: indicators.hotspots,
+          "Simple crack/Alligator crack": indicators.simpleAlligator,
+          "Rough Spot": indicators.roughSpot,
+          Repair: indicators.repair,
+          "Block crack/Oblique crack": indicators.blockOblique,
+          Rutting: indicators.rutting,
+          "Longitudinal crack/Transverse crack": indicators.longTransverse,
+          Raveling: indicators.raveling,
+          Date: today,
+          Length: length,
+          Area: area,
+          "Carriage Type ": carriageType,
+          "Single discrete crack": 0,
+          "Multiple cracks": 0,
+          "Joint crack": 0,
+          "Joint seal defects": 0,
+          Punchout: 0,
+          Slippage: 0,
+          Heaves: 0,
+          "Alligator crack": indicators.alligator,
+          "Oblique crack": indicators.oblique,
+          "Transverse crack": indicators.transverse,
+          Width: width,
+          Depth: depth,
+          "Hairline crack": indicators.hairline,
+          "Hungry Surface": indicators.hungrySurface,
+          Settlement: indicators.settlement,
+          Shoving: indicators.shoving,
+          Stripping: indicators.stripping,
+        };
+        rows.push(row);
       });
     });
-
-    return lines.join('\n');
+    return rows;
   };
 
   const handleDownloadDistressExcel = () => {
     if (!distressResults) return;
-    const csv = buildDistressCsv(distressResults);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const rows = buildDistressTemplateRows(distressResults);
+    if (!rows.length) {
+      alert("No defects available to export.");
+      return;
+    }
+    const orderedRows = rows.map((row) => {
+      const out = {};
+      DISTRESS_TEMPLATE_HEADERS.forEach((header) => {
+        out[header] = row[header] ?? "";
+      });
+      return out;
+    });
+    const worksheet = XLSX.utils.json_to_sheet(orderedRows, {
+      header: DISTRESS_TEMPLATE_HEADERS,
+    });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `distress_results_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+    a.download = buildDownloadFilename(distressResults);
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -470,6 +601,7 @@ function MainKmlApp() {
             offsetType={offsetType}
             laneCount={laneCount}
             kmlMergeOffset={kmlMergeOffset}
+            projectName={projectName}
             startDate={startDate}
             endDate={endDate}
             imageDirection={imageDirection}
@@ -571,6 +703,19 @@ function MainKmlApp() {
                   onChange={(e) => setEndDate(e.target.value)}
                 />
               </div>
+            </div>
+          </div>
+          <div className="card card--compact">
+            <div className="input-group input-group--full">
+              <label htmlFor="project-name-input">Project Name</label>
+              <input
+                id="project-name-input"
+                type="text"
+                placeholder="Enter project name"
+                className="sidebar-input"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+              />
             </div>
           </div>
           <div className="card card--compact">

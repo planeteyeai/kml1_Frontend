@@ -147,7 +147,7 @@ const featureCollectionToKml = (features = [], docName = 'Drawn KML') => {
 </kml>`;
 };
 
-const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffset, startDate, endDate, imageDirection, onSaveSuccess, initialGeoJson }, ref) => {
+const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffset, projectName, startDate, endDate, imageDirection, onSaveSuccess, initialGeoJson }, ref) => {
   const { token, user } = useAuth();
   const position = [18.5204, 73.8567]; // Pune center
   const [geoJsonData, setGeoJsonData] = useState(null);
@@ -199,6 +199,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
       formData.append('offsetType', offsetType);
       formData.append('laneCount', laneCount);
       formData.append('kmlMergeOffset', kmlMergeOffset);
+      formData.append('projectName', projectName || '');
       formData.append('startDate', startDate || '');
       formData.append('endDate', endDate || '');
       formData.append('imageDirection', imageDirection || 'down_to_up');
@@ -304,6 +305,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
         offsetType,
         laneCount,
         kmlMergeOffset,
+        projectName,
         startDate,
         endDate,
         imageDirection
