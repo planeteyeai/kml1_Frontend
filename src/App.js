@@ -419,6 +419,12 @@ function MainKmlApp() {
     const val = Number(n);
     return Number.isFinite(val) ? val.toFixed(3) : "0.000";
   };
+  const isSameChainage = (start, end) => {
+    const s = Number(start);
+    const e = Number(end);
+    if (!Number.isFinite(s) || !Number.isFinite(e)) return false;
+    return Math.abs(s - e) < 1e-9;
+  };
 
   const inferDirectionFromSide = (sideValue) => {
     const side = String(sideValue || "").trim().toUpperCase();
@@ -506,6 +512,7 @@ function MainKmlApp() {
         const end = Number.isFinite(Number(defect?.end))
           ? Number(defect.end)
           : parsed?.end ?? "";
+        if (isSameChainage(start, end)) return;
         const length = Number.isFinite(Number(defect?.length)) ? Number(defect.length) : 0;
         const width = Number.isFinite(Number(defect?.width)) ? Number(defect.width) : 0;
         const depth = Number.isFinite(Number(defect?.max_depth))
@@ -585,6 +592,7 @@ function MainKmlApp() {
         const end = Number.isFinite(Number(defect?.end))
           ? Number(defect.end)
           : parsed?.end ?? "";
+        if (isSameChainage(start, end)) return;
         const sideValue = defect?.side || parsed?.side || "";
         const direction = inferDirectionFromSide(sideValue);
         rows.push({
