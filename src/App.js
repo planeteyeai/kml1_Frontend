@@ -384,6 +384,18 @@ function MainKmlApp() {
     return defect?.type ? String(defect.type) : "Unknown";
   };
 
+  const normalizeDefectType = (value) => String(value || "").trim().toLowerCase();
+  const isReportedType = (value) => {
+    const t = normalizeDefectType(value);
+    // Strictly reported and never predicted.
+    return t.startsWith("reported_") && !t.includes("predicted");
+  };
+  const isPredictedType = (value) => {
+    const t = normalizeDefectType(value);
+    // Strictly predicted and never reported.
+    return t.startsWith("predicted_") && !t.includes("reported");
+  };
+
   const parseChainageFromImageName = (name = "") => {
     const match = String(name || "").match(
       /Chainage_(\d+(?:\.\d+)?)_to_(\d+(?:\.\d+)?)_([A-Za-z]+)_merged\.(?:png|kml)$/i
@@ -485,7 +497,8 @@ function MainKmlApp() {
       const parsed = parseChainageFromImageName(imageName);
       const defects = Array.isArray(imageData?.defects) ? imageData.defects : [];
       defects.forEach((defect) => {
-        const distressType = inferDistressType(defect);
+        if (!isReportedType(defect?.type)) return;
+        const distressType = normalizeDefectType(defect?.type);
         const indicators = getIndicatorValues(distressType);
         const start = Number.isFinite(Number(defect?.start))
           ? Number(defect.start)
@@ -563,7 +576,8 @@ function MainKmlApp() {
       const parsed = parseChainageFromImageName(imageName);
       const defects = Array.isArray(imageData?.defects) ? imageData.defects : [];
       defects.forEach((defect) => {
-        const distressType = inferDistressType(defect);
+        if (!isPredictedType(defect?.type)) return;
+        const distressType = normalizeDefectType(defect?.type);
         const indicators = getIndicatorValues(distressType);
         const start = Number.isFinite(Number(defect?.start))
           ? Number(defect.start)
