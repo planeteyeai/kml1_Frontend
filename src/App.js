@@ -59,6 +59,10 @@ const DISTRESS_TEMPLATE_HEADERS = [
   "Transverse crack",
   "Width",
   "Depth",
+  "Severity",
+  "Confidence",
+  "Sensors",
+  "Max Depth",
   "Hairline crack",
   "Hungry Surface",
   "Settlement",
@@ -88,6 +92,13 @@ const PREDICTED_TEMPLATE_HEADERS = [
   "Lane",
   "Date",
   "Carriage Type",
+  "Length",
+  "Width",
+  "Depth",
+  "Severity",
+  "Confidence",
+  "Sensors",
+  "Max Depth",
   "Hairline crack",
   "Longitudinal crack",
 ];
@@ -488,6 +499,11 @@ function MainKmlApp() {
     return defaults;
   };
 
+  const toNumberOrBlank = (value) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : "";
+  };
+
   const buildDistressTemplateRows = (resultsByImage) => {
     const rows = [];
     const today = new Date().toISOString().slice(0, 10).split("-").reverse().join("-");
@@ -555,6 +571,10 @@ function MainKmlApp() {
           "Transverse crack": indicators.transverse,
           Width: width,
           Depth: depth,
+          Severity: defect?.severity ?? "",
+          Confidence: toNumberOrBlank(defect?.confidence),
+          Sensors: toNumberOrBlank(defect?.sensors),
+          "Max Depth": toNumberOrBlank(defect?.max_depth),
           "Hairline crack": indicators.hairline,
           "Hungry Surface": indicators.hungrySurface,
           Settlement: indicators.settlement,
@@ -587,8 +607,8 @@ function MainKmlApp() {
         const sideValue = defect?.side || parsed?.side || "";
         const direction = inferDirectionFromSide(sideValue);
         rows.push({
-          Latitude: defect?.latitude ?? "",
-          Longitude: defect?.longitude ?? "",
+          Latitude: toNumberOrBlank(defect?.latitude),
+          Longitude: toNumberOrBlank(defect?.longitude),
           "Project Name": projectName || "",
           "Chainage Start": start,
           "Chainage End": end,
@@ -609,6 +629,13 @@ function MainKmlApp() {
           Lane: sideValue,
           Date: today,
           "Carriage Type": carriageType,
+          Length: toNumberOrBlank(defect?.length),
+          Width: toNumberOrBlank(defect?.width),
+          Depth: toNumberOrBlank(defect?.max_depth ?? defect?.reported_depth),
+          Severity: defect?.severity ?? "",
+          Confidence: toNumberOrBlank(defect?.confidence),
+          Sensors: toNumberOrBlank(defect?.sensors),
+          "Max Depth": toNumberOrBlank(defect?.max_depth),
           "Hairline crack": indicators.hairline,
           "Longitudinal crack": indicators.longitudinal,
         });
@@ -665,6 +692,10 @@ function MainKmlApp() {
           "Carriage Type ": carriageType,
           Width: 0,
           Depth: 0,
+          Severity: "",
+          Confidence: "",
+          Sensors: "",
+          "Max Depth": "",
         });
       } else {
         rows.push({
@@ -679,6 +710,13 @@ function MainKmlApp() {
           Lane: sideValue,
           Date: today,
           "Carriage Type": carriageType,
+          Length: 0,
+          Width: 0,
+          Depth: 0,
+          Severity: "",
+          Confidence: "",
+          Sensors: "",
+          "Max Depth": "",
         });
       }
     });
