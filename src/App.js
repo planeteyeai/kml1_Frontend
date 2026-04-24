@@ -65,6 +65,32 @@ const DISTRESS_TEMPLATE_HEADERS = [
   "Shoving",
   "Stripping",
 ];
+const PREDICTED_TEMPLATE_HEADERS = [
+  "Latitude",
+  "Longitude",
+  "Project Name",
+  "Chainage Start",
+  "Chainage End",
+  "Total Distress",
+  "Distress Type",
+  "Pothole",
+  "Alligator crack",
+  "Block crack/Oblique crack",
+  "Edge Break",
+  "Patchwork",
+  "Bleeding",
+  "Hotspots",
+  "Rutting",
+  "Raveling",
+  "Transverse crack",
+  "Rough Spot",
+  "Direction",
+  "Lane",
+  "Date",
+  "Carriage Type",
+  "Hairline crack",
+  "Longitudinal crack",
+];
 
 function MainKmlApp() {
   const { user, token, logout, loading: authLoading } = useAuth();
@@ -389,19 +415,17 @@ function MainKmlApp() {
     return "";
   };
 
-  const buildDownloadFilename = (resultsByImage) => {
+  const getExportBaseName = (resultsByImage) => {
     const entries = Object.keys(resultsByImage || {})
       .map(parseChainageFromImageName)
       .filter(Boolean);
     const project = toFileProjectName(projectName);
     if (!entries.length) {
-      return `${project}_distress.xlsx`;
+      return `${project}_Chainage_0.000_to_0.000`;
     }
     const minStart = Math.min(...entries.map((x) => x.start));
     const maxEnd = Math.max(...entries.map((x) => x.end));
-    const sides = [...new Set(entries.map((x) => x.side))];
-    const side = sides.length === 1 ? sides[0] : "BOTH";
-    return `${project}_Chainage_${toThree(minStart)}_to_${toThree(maxEnd)}_${side}.xlsx`;
+    return `${project}_Chainage_${toThree(minStart)}_to_${toThree(maxEnd)}`;
   };
 
   const getIndicatorValues = (distressType) => {
@@ -417,6 +441,7 @@ function MainKmlApp() {
       blockOblique: 0,
       rutting: 0,
       longTransverse: 0,
+      longitudinal: 0,
       raveling: 0,
       alligator: 0,
       oblique: 0,
@@ -439,6 +464,7 @@ function MainKmlApp() {
     if (key.includes("block") || key.includes("oblique")) defaults.blockOblique = 1;
     if (key.includes("rut")) defaults.rutting = 1;
     if (key.includes("longitudinal") || key.includes("transverse")) defaults.longTransverse = 1;
+    if (key.includes("longitudinal")) defaults.longitudinal = 1;
     if (key.includes("ravel")) defaults.raveling = 1;
     if (key.includes("alligator")) defaults.alligator = 1;
     if (key.includes("oblique")) defaults.oblique = 1;
@@ -529,23 +555,64 @@ function MainKmlApp() {
     return rows;
   };
 
-  const handleDownloadDistressExcel = () => {
-    if (!distressResults) return;
-    const rows = buildDistressTemplateRows(distressResults);
-    if (!rows.length) {
-      alert("No defects available to export.");
-      return;
-    }
+  const buildPredictedTemplateRows = (resultsByImage) => {
+    const rows = [];
+    const today = new Date().toISOString().slice(0, 10).split("-").reverse().join("-");
+    const carriageType = "Flexible";
+    Object.entries(resultsByImage || {}).forEach(([imageName, imageData]) => {
+      const parsed = parseChainageFromImageName(imageName);
+      const defects = Array.isArray(imageData?.defects) ? imageData.defects : [];
+      defects.forEach((defect) => {
+        const distressType = inferDistressType(defect);
+        const indicators = getIndicatorValues(distressType);
+        const start = Number.isFinite(Number(defect?.start))
+          ? Number(defect.start)
+          : parsed?.start ?? "";
+        const end = Number.isFinite(Number(defect?.end))
+          ? Number(defect.end)
+          : parsed?.end ?? "";
+        const sideValue = defect?.side || parsed?.side || "";
+        const direction = inferDirectionFromSide(sideValue);
+        rows.push({
+          Latitude: defect?.latitude ?? "",
+          Longitude: defect?.longitude ?? "",
+          "Project Name": projectName || "",
+          "Chainage Start": start,
+          "Chainage End": end,
+          "Total Distress": 1,
+          "Distress Type": distressType,
+          Pothole: indicators.pothole,
+          "Alligator crack": indicators.alligator,
+          "Block crack/Oblique crack": indicators.blockOblique,
+          "Edge Break": indicators.edgeBreak,
+          Patchwork: indicators.patchwork,
+          Bleeding: indicators.bleeding,
+          Hotspots: indicators.hotspots,
+          Rutting: indicators.rutting,
+          Raveling: indicators.raveling,
+          "Transverse crack": indicators.transverse,
+          "Rough Spot": indicators.roughSpot,
+          Direction: direction,
+          Lane: sideValue,
+          Date: today,
+          "Carriage Type": carriageType,
+          "Hairline crack": indicators.hairline,
+          "Longitudinal crack": indicators.longitudinal,
+        });
+      });
+    });
+    return rows;
+  };
+
+  const downloadWorkbook = (rows, headers, fileName) => {
     const orderedRows = rows.map((row) => {
       const out = {};
-      DISTRESS_TEMPLATE_HEADERS.forEach((header) => {
+      headers.forEach((header) => {
         out[header] = row[header] ?? "";
       });
       return out;
     });
-    const worksheet = XLSX.utils.json_to_sheet(orderedRows, {
-      header: DISTRESS_TEMPLATE_HEADERS,
-    });
+    const worksheet = XLSX.utils.json_to_sheet(orderedRows, { header: headers });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
     const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
@@ -553,13 +620,41 @@ function MainKmlApp() {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = buildDownloadFilename(distressResults);
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadDistressExcel = () => {
+    if (!distressResults) return;
+    const reportedRows = buildDistressTemplateRows(distressResults);
+    const predictedRows = buildPredictedTemplateRows(distressResults);
+    if (!reportedRows.length && !predictedRows.length) {
+      alert("No defects available to export.");
+      return;
+    }
+    const baseName = getExportBaseName(distressResults);
+    if (reportedRows.length) {
+      downloadWorkbook(
+        reportedRows,
+        DISTRESS_TEMPLATE_HEADERS,
+        `${baseName}_reported.xlsx`
+      );
+    }
+    // Trigger second file a moment later to avoid some browsers dropping one download.
+    if (predictedRows.length) {
+      setTimeout(() => {
+        downloadWorkbook(
+          predictedRows,
+          PREDICTED_TEMPLATE_HEADERS,
+          `${baseName}_predicted.xlsx`
+        );
+      }, 250);
+    }
   };
 
   const handleOpenDistressPrediction = () => {
