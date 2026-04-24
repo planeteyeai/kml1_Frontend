@@ -632,6 +632,77 @@ function MainKmlApp() {
     return XLSX.utils.json_to_sheet(orderedRows, { header: headers });
   };
 
+  const buildNoDefectFallbackRows = (resultsByImage, mode = "predicted") => {
+    const today = new Date().toISOString().slice(0, 10).split("-").reverse().join("-");
+    const carriageType = "Flexible";
+    const rows = [];
+    Object.entries(resultsByImage || {}).forEach(([imageName, imageData]) => {
+      const parsed = parseChainageFromImageName(imageName);
+      const counts = imageData?.counts || {};
+      const totalDistress =
+        Number(counts.reported_crack || 0) +
+        Number(counts.predicted_crack || 0) +
+        Number(counts.reported_pothole || 0) +
+        Number(counts.predicted_pothole || 0) +
+        Number(counts.reported_alligator_crack || 0) +
+        Number(counts.predicted_alligator_crack || 0);
+      const sideValue = parsed?.side || "";
+      const direction = inferDirectionFromSide(sideValue);
+      if (mode === "reported") {
+        rows.push({
+          Latitude: "",
+          Longitude: "",
+          "Chainage Start": parsed?.start ?? "",
+          "Chainage End": parsed?.end ?? "",
+          "Project Name": projectName || "",
+          "Distress Type": "no_distress_detected",
+          Direction: direction,
+          Lane: sideValue,
+          "Total Distress": totalDistress,
+          Date: today,
+          Length: 0,
+          Area: 0,
+          "Carriage Type ": carriageType,
+          Width: 0,
+          Depth: 0,
+        });
+      } else {
+        rows.push({
+          Latitude: "",
+          Longitude: "",
+          "Project Name": projectName || "",
+          "Chainage Start": parsed?.start ?? "",
+          "Chainage End": parsed?.end ?? "",
+          "Total Distress": totalDistress,
+          "Distress Type": "no_distress_detected",
+          Direction: direction,
+          Lane: sideValue,
+          Date: today,
+          "Carriage Type": carriageType,
+        });
+      }
+    });
+    return rows;
+  };
+
+  const downloadSingleSheetWorkbook = (rows, headers, sheetName, fileName) => {
+    const sheet = buildWorksheet(rows, headers);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const downloadWorkbook = (reportedRows, predictedRows, fileName) => {
     const reportedSheet = buildWorksheet(reportedRows, DISTRESS_TEMPLATE_HEADERS);
     const predictedSheet = buildWorksheet(predictedRows, PREDICTED_TEMPLATE_HEADERS);
@@ -705,6 +776,36 @@ function MainKmlApp() {
     }
     const baseName = getExportBaseName(distressResults);
     downloadWorkbook(reportedRows, predictedRows, `${baseName}_distress.xlsx`);
+  };
+
+  const handleDownloadReportedExcel = () => {
+    if (!distressResults) return;
+    let reportedRows = buildDistressTemplateRows(distressResults);
+    if (!reportedRows.length) {
+      reportedRows = buildNoDefectFallbackRows(distressResults, "reported");
+    }
+    const baseName = getExportBaseName(distressResults);
+    downloadSingleSheetWorkbook(
+      reportedRows,
+      DISTRESS_TEMPLATE_HEADERS,
+      "Reported",
+      `${baseName}_reported.xlsx`
+    );
+  };
+
+  const handleDownloadPredictedExcel = () => {
+    if (!distressResults) return;
+    let predictedRows = buildPredictedTemplateRows(distressResults);
+    if (!predictedRows.length) {
+      predictedRows = buildNoDefectFallbackRows(distressResults, "predicted");
+    }
+    const baseName = getExportBaseName(distressResults);
+    downloadSingleSheetWorkbook(
+      predictedRows,
+      PREDICTED_TEMPLATE_HEADERS,
+      "Predicted",
+      `${baseName}_predicted.xlsx`
+    );
   };
 
   const handleOpenDistressPrediction = () => {
@@ -935,12 +1036,26 @@ function MainKmlApp() {
                 <h2>Image-wise Distress Data</h2>
               </div>
               {distressResults && (
-                <button
-                  className="distress-download-button"
-                  onClick={handleDownloadDistressExcel}
-                >
-                  Download Excel
-                </button>
+                <>
+                  <button
+                    className="distress-download-button"
+                    onClick={handleDownloadReportedExcel}
+                  >
+                    Download Reported Excel
+                  </button>
+                  <button
+                    className="distress-download-button"
+                    onClick={handleDownloadPredictedExcel}
+                  >
+                    Download Predicted Excel
+                  </button>
+                  <button
+                    className="distress-download-button"
+                    onClick={handleDownloadDistressExcel}
+                  >
+                    Download Combined Excel
+                  </button>
+                </>
               )}
               <button
                 className="close-button"
