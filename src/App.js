@@ -634,7 +634,9 @@ function MainKmlApp() {
       });
       return out;
     });
-    const worksheet = XLSX.utils.json_to_sheet(orderedRows, { header: headers });
+    const worksheet = orderedRows.length
+      ? XLSX.utils.json_to_sheet(orderedRows, { header: headers })
+      : XLSX.utils.aoa_to_sheet([headers]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
     const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
@@ -655,28 +657,20 @@ function MainKmlApp() {
     if (!distressResults) return;
     const reportedRows = buildDistressTemplateRows(distressResults);
     const predictedRows = buildPredictedTemplateRows(distressResults);
-    if (!reportedRows.length && !predictedRows.length) {
-      alert("No defects available to export.");
-      return;
-    }
     const baseName = getExportBaseName(distressResults);
-    if (reportedRows.length) {
-      downloadWorkbook(
-        reportedRows,
-        DISTRESS_TEMPLATE_HEADERS,
-        `${baseName}_reported.xlsx`
-      );
-    }
+    downloadWorkbook(
+      reportedRows,
+      DISTRESS_TEMPLATE_HEADERS,
+      `${baseName}_reported.xlsx`
+    );
     // Trigger second file a moment later to avoid some browsers dropping one download.
-    if (predictedRows.length) {
-      setTimeout(() => {
-        downloadWorkbook(
-          predictedRows,
-          PREDICTED_TEMPLATE_HEADERS,
-          `${baseName}_predicted.xlsx`
-        );
-      }, 250);
-    }
+    setTimeout(() => {
+      downloadWorkbook(
+        predictedRows,
+        PREDICTED_TEMPLATE_HEADERS,
+        `${baseName}_predicted.xlsx`
+      );
+    }, 250);
   };
 
   const handleOpenDistressPrediction = () => {
