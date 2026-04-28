@@ -1,5 +1,35 @@
 import axios from "axios";
 import API_URL from "./config";
+import JSZip from "jszip";
+
+const DISTRESS_CLONE_BASE = "https://web-production-aad6d.up.railway.app";
+
+function getFilenameFromContentDisposition(headers, fallback) {
+  const cd =
+    (headers && headers["content-disposition"]) ||
+    (headers && headers.get && headers.get("content-disposition"));
+  if (cd && typeof cd === "string") {
+    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+    if (match && match[1]) {
+      try {
+        return decodeURIComponent(match[1].replace(/"/g, "").trim());
+      } catch (_) {
+        return match[1].replace(/"/g, "").trim();
+      }
+    }
+  }
+  return fallback;
+}
+
+async function removeFilesFromZipBlob(zipBlob, shouldRemove) {
+  const zip = await JSZip.loadAsync(zipBlob);
+  Object.keys(zip.files).forEach((name) => {
+    if (shouldRemove(name)) {
+      zip.remove(name);
+    }
+  });
+  return await zip.generateAsync({ type: "blob" });
+}
 
 export async function generateDistressReport({ file, startDate, endDate, projectName }) {
   const params = new URLSearchParams();
@@ -17,21 +47,92 @@ export async function generateDistressReport({ file, startDate, endDate, project
   const response = await axios.post(url, formData, {
     responseType: "blob",
   });
-  let filename = "distress_report.xlsx";
-  const cd =
-    (response.headers && response.headers["content-disposition"]) ||
-    (response.headers && response.headers.get && response.headers.get("content-disposition"));
-  if (cd && typeof cd === "string") {
-    const match = cd.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
-    if (match && match[1]) {
-      try {
-        filename = decodeURIComponent(match[1].replace(/\"/g, "").trim());
-      } catch (_) {
-        filename = match[1].replace(/\"/g, "").trim();
-      }
+  const filename = getFilenameFromContentDisposition(
+    response.headers,
+    "distress_report.xlsx"
+  );
+  return { blob: response.data, filename };
+}
+
+// Distress Report (clone): POST /detect, then GET /download-all (zip)
+export async function generateDistressReportClone({ file, startDate, endDate }) {
+  const formData = new FormData();
+  if (startDate) formData.append("start_date", startDate);
+  if (endDate) formData.append("end_date", endDate);
+
+  if (file) {
+    // API expects field name 'kml' for the upload
+    try {
+      const kmlFile = new File([file], file.name, {
+        type: "application/vnd.google-earth.kml+xml",
+      });
+      formData.append("kml", kmlFile);
+    } catch (_) {
+      formData.append("kml", file);
     }
   }
-  return { blob: response.data, filename };
+
+  // 1) Trigger processing
+  await axios.post(`${DISTRESS_CLONE_BASE}/detect`, formData, {
+    headers: { Accept: "application/json" },
+  });
+
+  // 2) Download zip output (poll until backend finishes)
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const tryDownload = async () => {
+    const resp = await axios.get(`${DISTRESS_CLONE_BASE}/download-all`, {
+      responseType: "blob",
+      headers: { Accept: "application/zip, application/octet-stream" },
+      validateStatus: () => true, // we handle status manually for polling
+    });
+
+    // Not ready yet (common patterns)
+    if (resp.status === 202 || resp.status === 404) return null;
+    if (resp.status >= 400) {
+      // If backend returns JSON error as blob, surface it
+      const ct = (resp.headers && resp.headers["content-type"]) || "";
+      if (ct.includes("application/json") && resp.data && typeof resp.data.text === "function") {
+        const text = await resp.data.text();
+        throw new Error(text || `Download failed (${resp.status})`);
+      }
+      throw new Error(`Download failed (${resp.status})`);
+    }
+
+    // Sometimes backend returns JSON "not ready" as 200; detect and keep polling
+    const ct = (resp.headers && resp.headers["content-type"]) || "";
+    if (ct.includes("application/json") && resp.data && typeof resp.data.text === "function") {
+      const text = await resp.data.text();
+      const lower = String(text || "").trim().toLowerCase();
+      if (lower.includes("not ready") || lower.includes("processing") || lower.includes("wait")) {
+        return null;
+      }
+      throw new Error(text || "Unexpected JSON response from download endpoint");
+    }
+
+    const filename = getFilenameFromContentDisposition(resp.headers, "distress_report.zip");
+    let blob = resp.data;
+
+    // Remove geojson + csv from the downloaded zip (client-side)
+    try {
+      blob = await removeFilesFromZipBlob(blob, (name) => {
+        const lower = String(name || "").toLowerCase();
+        return lower.endsWith(".geojson") || lower.endsWith(".csv");
+      });
+    } catch (_) {
+      // If zip manipulation fails, fall back to original backend zip
+    }
+
+    return { blob, filename };
+  };
+
+  // up to ~90s total (quick start, then slower)
+  const delays = [400, 600, 800, 1200, 1500, 2000, 2500, 3000, 3500, 4000];
+  for (let i = 0; i < delays.length; i++) {
+    const res = await tryDownload();
+    if (res) return res;
+    await sleep(delays[i]);
+  }
+  throw new Error("ZIP not ready yet. Please try again in a few seconds.");
 }
 
 export async function getDistressPredictedJson({ startDate, endDate, projectName }) {
@@ -79,12 +180,12 @@ export async function generateDistressPredicted({ file, startDate, endDate, proj
     (response.headers && response.headers.get && response.headers.get("content-disposition"));
   let filename = "distress_predicted.xlsx";
   if (cd && typeof cd === "string") {
-    const match = cd.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
+    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
     if (match && match[1]) {
       try {
-        filename = decodeURIComponent(match[1].replace(/\"/g, "").trim());
+        filename = decodeURIComponent(match[1].replace(/"/g, "").trim());
       } catch (_) {
-        filename = match[1].replace(/\"/g, "").trim();
+        filename = match[1].replace(/"/g, "").trim();
       }
     }
   }
@@ -124,12 +225,12 @@ export async function downloadDetectPredictedDistressCombined({
     (response.headers && response.headers["content-disposition"]) ||
     (response.headers && response.headers.get && response.headers.get("content-disposition"));
   if (cd && typeof cd === "string") {
-    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
     if (match && match[1]) {
       try {
-        filename = decodeURIComponent(match[1].replace(/\"/g, "").trim());
+        filename = decodeURIComponent(match[1].replace(/"/g, "").trim());
       } catch (_) {
-        filename = match[1].replace(/\"/g, "").trim();
+        filename = match[1].replace(/"/g, "").trim();
       }
     }
   }
@@ -164,12 +265,12 @@ export async function generateDistressFullpipelineProxy({
       response.headers.get &&
       response.headers.get("content-disposition"));
   if (cd && typeof cd === "string") {
-    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
     if (match && match[1]) {
       try {
-        filename = decodeURIComponent(match[1].replace(/\"/g, "").trim());
+        filename = decodeURIComponent(match[1].replace(/"/g, "").trim());
       } catch (_) {
-        filename = match[1].replace(/\"/g, "").trim();
+        filename = match[1].replace(/"/g, "").trim();
       }
     }
   }
@@ -228,12 +329,12 @@ export async function generateDistressFullpipelineDirect({
       (resp.headers && resp.headers["content-disposition"]) ||
       (resp.headers && resp.headers.get && resp.headers.get("content-disposition"));
     if (cd && typeof cd === "string") {
-      const match = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+      const match = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
       if (match && match[1]) {
         try {
-          filename = decodeURIComponent(match[1].replace(/\"/g, "").trim());
+          filename = decodeURIComponent(match[1].replace(/"/g, "").trim());
         } catch (_) {
-          filename = match[1].replace(/\"/g, "").trim();
+          filename = match[1].replace(/"/g, "").trim();
         }
       }
     }
@@ -292,12 +393,12 @@ export async function downloadDetectDistressFinalPredicted({
       response.headers.get &&
       response.headers.get("content-disposition"));
   if (cd && typeof cd === "string") {
-    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
     if (match && match[1]) {
       try {
-        filename = decodeURIComponent(match[1].replace(/\"/g, "").trim());
+        filename = decodeURIComponent(match[1].replace(/"/g, "").trim());
       } catch (_) {
-        filename = match[1].replace(/\"/g, "").trim();
+        filename = match[1].replace(/"/g, "").trim();
       }
     }
   }
@@ -334,12 +435,12 @@ export async function generateDistressFinalPredictedProxy({
       response.headers.get &&
       response.headers.get("content-disposition"));
   if (cd && typeof cd === "string") {
-    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
     if (match && match[1]) {
       try {
-        filename = decodeURIComponent(match[1].replace(/\"/g, "").trim());
+        filename = decodeURIComponent(match[1].replace(/"/g, "").trim());
       } catch (_) {
-        filename = match[1].replace(/\"/g, "").trim();
+        filename = match[1].replace(/"/g, "").trim();
       }
     }
   }
@@ -397,12 +498,12 @@ export async function downloadDistressFullpipeline({ startDate, endDate }) {
     (response.headers && response.headers["content-disposition"]) ||
     (response.headers && response.headers.get && response.headers.get("content-disposition"));
   if (cd && typeof cd === "string") {
-    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+    const match = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
     if (match && match[1]) {
       try {
-        filename = decodeURIComponent(match[1].replace(/\"/g, "").trim());
+        filename = decodeURIComponent(match[1].replace(/"/g, "").trim());
       } catch (_) {
-        filename = match[1].replace(/\"/g, "").trim();
+        filename = match[1].replace(/"/g, "").trim();
       }
     }
   }

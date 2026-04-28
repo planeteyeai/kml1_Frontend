@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
-import { generateDistressFullpipelineDirect, generateDistressFullpipelineProxy } from "./ApiService";
+import { generateDistressReportClone } from "./ApiService";
 
 const toYmd = (val) => {
   if (!val) return val;
@@ -22,10 +22,10 @@ const toYmd = (val) => {
 export default function DistressReport() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [projectName, setProjectName] = useState("");
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [csvBlob, setCsvBlob] = useState(null);
+  const [downloadName, setDownloadName] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
@@ -48,30 +48,20 @@ export default function DistressReport() {
     setSuccessMessage("");
     setErrorMessage("");
     setCsvBlob(null);
+    setDownloadName("");
 
-    if (!startDate || !endDate || !file || !projectName) {
-      setErrorMessage("Start date, end date, project name, and KML file are required.");
+    if (!startDate || !endDate || !file) {
+      setErrorMessage("Start date, end date, and KML file are required.");
       return;
     }
 
     try {
       setLoading(true);
-      let result;
-      try {
-        result = await generateDistressFullpipelineDirect({
-          file,
-          startDate: toYmd(startDate),
-          endDate: toYmd(endDate),
-          projectName,
-        });
-      } catch (_) {
-        result = await generateDistressFullpipelineProxy({
-          file,
-          startDate: toYmd(startDate),
-          endDate: toYmd(endDate),
-          projectName,
-        });
-      }
+      const result = await generateDistressReportClone({
+        file,
+        startDate: toYmd(startDate),
+        endDate: toYmd(endDate),
+      });
 
       if (!result || !result.blob) {
         setErrorMessage("No data returned for the selected period.");
@@ -79,7 +69,18 @@ export default function DistressReport() {
       }
 
       setCsvBlob(result.blob);
-      setSuccessMessage("Report generated successfully. You can now download the file.");
+      setDownloadName(result.filename || "distress_report.zip");
+      setSuccessMessage("Report generated successfully. ZIP download will start automatically.");
+
+      // Auto-download zip
+      const url = window.URL.createObjectURL(result.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", result.filename || "distress_report.zip");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       let detail = null;
       if (err && err.response && err.response.data) {
@@ -91,6 +92,9 @@ export default function DistressReport() {
         } else if (data.detail || data.message || data.error) {
           detail = data.detail || data.message || data.error;
         }
+      }
+      if (!detail && err && typeof err.message === "string") {
+        detail = err.message;
       }
       setErrorMessage(
         detail || "Failed to generate report. Please check your input and try again."
@@ -104,9 +108,8 @@ export default function DistressReport() {
     if (!csvBlob) return;
     const safeStart = toYmd(startDate) || "start";
     const safeEnd = toYmd(endDate) || "end";
-    const mime = csvBlob.type || "";
-    const ext = mime.includes("spreadsheetml") || mime.includes("excel") ? "xlsx" : "csv";
-    const filename = `distress_report_${safeStart}_${safeEnd}.${ext}`;
+    const fallback = `distress_report_${safeStart}_${safeEnd}.zip`;
+    const filename = downloadName || fallback;
     const url = window.URL.createObjectURL(csvBlob);
     const link = document.createElement("a");
     link.href = url;
@@ -198,19 +201,6 @@ export default function DistressReport() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium uppercase tracking-wide text-slate-300">
-                  Project Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter project name"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none ring-0 transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/40"
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-wide text-slate-300">
                   Upload KML File
                 </label>
                 <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed border-slate-600 bg-slate-900/80 px-3 py-2 text-sm text-slate-200 transition hover:border-cyan-400 hover:bg-slate-900">
@@ -254,7 +244,7 @@ export default function DistressReport() {
                   disabled={!csvBlob || loading}
                   className="inline-flex items-center justify-center rounded-full border border-slate-600/80 px-5 py-2 text-sm font-semibold text-slate-100 transition hover:border-emerald-400 hover:text-emerald-300 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
                 >
-                  Download Report
+                  Download ZIP
                 </button>
               </div>
             </form>
