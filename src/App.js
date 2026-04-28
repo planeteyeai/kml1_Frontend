@@ -286,6 +286,26 @@ function MainKmlApp() {
               <button
                 className="landing-card landing-card-secondary"
                 type="button"
+                onClick={() => navigate("/distress-report")}
+              >
+                <div className="landing-card-logo landing-card-logo-distress">
+                  <img
+                    src="/Distress_report.png"
+                    alt="Distress Report (Clone)"
+                    className="landing-card-logo-image"
+                  />
+                </div>
+                <div className="landing-card-label">Distress Report (Clone)</div>
+                <div className="landing-card-description">
+                  Prepare and manage distress reporting for your projects.
+                </div>
+                <div className="landing-card-footer">
+                  <span className="landing-card-cta secondary">Get Started</span>
+                </div>
+              </button>
+              <button
+                className="landing-card landing-card-secondary"
+                type="button"
                 onClick={() => navigate("/distress-predicted")}
               >
                 <div className="landing-card-logo landing-card-logo-Predicted">
