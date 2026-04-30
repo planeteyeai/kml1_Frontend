@@ -7,6 +7,7 @@ import { useAuth } from "./AuthContext";
 import API_URL from "./config";
 import { apiHeaders } from "./apiHeaders";
 import DistressReport from "./DistressReport";
+import DistressReportClone2 from "./DistressReportClone2";
 import DistressPredicted from "./DistressPredicted";
 import InventoryCard from "./InventoryCard";
 import KMLSelection from "./KMLSelection";
@@ -296,6 +297,26 @@ function MainKmlApp() {
                   />
                 </div>
                 <div className="landing-card-label">Distress Report (Clone)</div>
+                <div className="landing-card-description">
+                  Prepare and manage distress reporting for your projects.
+                </div>
+                <div className="landing-card-footer">
+                  <span className="landing-card-cta secondary">Get Started</span>
+                </div>
+              </button>
+              <button
+                className="landing-card landing-card-secondary"
+                type="button"
+                onClick={() => navigate("/distress-report-clone-2")}
+              >
+                <div className="landing-card-logo landing-card-logo-distress">
+                  <img
+                    src="/Distress_report.png"
+                    alt="Distress Report (Clone 2)"
+                    className="landing-card-logo-image"
+                  />
+                </div>
+                <div className="landing-card-label">DISTRESS REPORT (CLONE 2)</div>
                 <div className="landing-card-description">
                   Prepare and manage distress reporting for your projects.
                 </div>
@@ -1117,6 +1138,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/distress-report" element={<DistressReport />} />
+        <Route path="/distress-report-clone-2" element={<DistressReportClone2 />} />
         <Route path="/distress-predicted" element={<DistressPredicted />} />
         <Route path="/inventory" element={<KMLSelection />} />
         <Route path="/inventory/kml-1" element={<KML1Form />} />

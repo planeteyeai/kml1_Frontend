@@ -3,6 +3,7 @@ import API_URL from "./config";
 import JSZip from "jszip";
 
 const DISTRESS_CLONE_BASE = "https://web-production-aad6d.up.railway.app";
+const DISTRESS_CLONE2_BASE = "https://distress-clone2.up.railway.app";
 
 function getFilenameFromContentDisposition(headers, fallback) {
   const cd =
@@ -133,6 +134,97 @@ export async function generateDistressReportClone({ file, startDate, endDate }) 
     await sleep(delays[i]);
   }
   throw new Error("ZIP not ready yet. Please try again in a few seconds.");
+}
+
+export async function generateDistressReportClone2({ file, startDate, endDate }) {
+  const formData = new FormData();
+  if (startDate) formData.append("start_date", startDate);
+  if (endDate) formData.append("end_date", endDate);
+
+  if (file) {
+    try {
+      const kmlFile = new File([file], file.name, {
+        type: "application/vnd.google-earth.kml+xml",
+      });
+      formData.append("roi_kml", kmlFile);
+    } catch (_) {
+      formData.append("roi_kml", file);
+    }
+  }
+
+  const response = await axios.post(`${DISTRESS_CLONE2_BASE}/screen`, formData, {
+    responseType: "blob",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  const contentType = String(
+    (response.headers && response.headers["content-type"]) || ""
+  ).toLowerCase();
+
+  // Handle APIs that return downloadable ZIP directly in response.
+  if (
+    contentType.includes("application/zip") ||
+    contentType.includes("application/octet-stream")
+  ) {
+    const filename = getFilenameFromContentDisposition(
+      response.headers,
+      "distress_report_clone2.zip"
+    );
+    return { blob: response.data, filename };
+  }
+
+  // Handle APIs that return JSON metadata with a separate file URL or base64 payload.
+  if (contentType.includes("application/json") && response.data?.text) {
+    const raw = await response.data.text();
+    const payload = raw ? JSON.parse(raw) : {};
+
+    const maybeUrl =
+      payload?.download_url ||
+      payload?.downloadUrl ||
+      payload?.zip_url ||
+      payload?.zipUrl ||
+      payload?.url ||
+      payload?.file_url;
+
+    if (maybeUrl) {
+      const downloadResp = await axios.get(maybeUrl, {
+        responseType: "blob",
+        headers: { Accept: "application/zip, application/octet-stream" },
+      });
+      const filename = getFilenameFromContentDisposition(
+        downloadResp.headers,
+        "distress_report_clone2.zip"
+      );
+      return { blob: downloadResp.data, filename };
+    }
+
+    const maybeBase64 = payload?.zip_base64 || payload?.zipBase64;
+    if (maybeBase64) {
+      const binary = atob(maybeBase64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: "application/zip" });
+      return { blob, filename: "distress_report_clone2.zip" };
+    }
+
+    throw new Error(
+      payload?.detail ||
+      payload?.message ||
+      payload?.error ||
+      "Clone 2 API did not return a downloadable ZIP."
+    );
+  }
+
+  return {
+    blob: response.data,
+    filename: getFilenameFromContentDisposition(
+      response.headers,
+      "distress_report_clone2.zip"
+    ),
+  };
 }
 
 export async function getDistressPredictedJson({ startDate, endDate, projectName }) {
