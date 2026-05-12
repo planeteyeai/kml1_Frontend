@@ -9,6 +9,7 @@ import { apiHeaders } from "./apiHeaders";
 import DistressReport from "./DistressReport";
 import DistressReportClone2 from "./DistressReportClone2";
 import DistressPredicted from "./DistressPredicted";
+import FinalDistressDetection from "./FinalDistressDetection";
 import InventoryCard from "./InventoryCard";
 import KMLSelection from "./KMLSelection";
 import KML1Form from "./KML1Form";
@@ -264,7 +265,8 @@ function MainKmlApp() {
                   <span className="landing-card-cta primary">Get Started</span>
                 </div>
               </button>
-              <button
+
+              {/* <button
                 className="landing-card landing-card-secondary"
                 type="button"
                 onClick={() => navigate("/distress-report")}
@@ -283,8 +285,9 @@ function MainKmlApp() {
                 <div className="landing-card-footer">
                   <span className="landing-card-cta secondary">Get Started</span>
                 </div>
-              </button>
-              <button
+              </button> */}
+
+              {/* <button
                 className="landing-card landing-card-secondary"
                 type="button"
                 onClick={() => navigate("/distress-report")}
@@ -303,8 +306,9 @@ function MainKmlApp() {
                 <div className="landing-card-footer">
                   <span className="landing-card-cta secondary">Get Started</span>
                 </div>
-              </button>
-              <button
+              </button> */}
+
+              {/* <button
                 className="landing-card landing-card-secondary"
                 type="button"
                 onClick={() => navigate("/distress-report-clone-2")}
@@ -323,8 +327,9 @@ function MainKmlApp() {
                 <div className="landing-card-footer">
                   <span className="landing-card-cta secondary">Get Started</span>
                 </div>
-              </button>
-              <button
+              </button> */}
+
+              {/* <button
                 className="landing-card landing-card-secondary"
                 type="button"
                 onClick={() => navigate("/distress-predicted")}
@@ -339,6 +344,27 @@ function MainKmlApp() {
                 <div className="landing-card-label">Distress Predicted</div>
                 <div className="landing-card-description">
                   Advanced distress detection and analytics.
+                </div>
+                <div className="landing-card-footer">
+                  <span className="landing-card-cta secondary">Get Started</span>
+                </div>
+              </button> */}
+
+              <button
+                className="landing-card landing-card-secondary"
+                type="button"
+                onClick={() => navigate("/final-distress-detection")}
+              >
+                <div className="landing-card-logo landing-card-logo-Predicted">
+                  <img
+                    src="/Destress_Predicted.png"
+                    alt="Final Distress Detection"
+                    className="landing-card-logo-image"
+                  />
+                </div>
+                <div className="landing-card-label">Final Distress Detection</div>
+                <div className="landing-card-description">
+                  Run the final distress detection workflow and download outputs.
                 </div>
                 <div className="landing-card-footer">
                   <span className="landing-card-cta secondary">Get Started</span>
@@ -1140,6 +1166,7 @@ function App() {
         <Route path="/distress-report" element={<DistressReport />} />
         <Route path="/distress-report-clone-2" element={<DistressReportClone2 />} />
         <Route path="/distress-predicted" element={<DistressPredicted />} />
+        <Route path="/final-distress-detection" element={<FinalDistressDetection />} />
         <Route path="/inventory" element={<KMLSelection />} />
         <Route path="/inventory/kml-1" element={<KML1Form />} />
         <Route path="/inventory/kml-2" element={<KML2Form />} />

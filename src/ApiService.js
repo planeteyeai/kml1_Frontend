@@ -4,6 +4,7 @@ import JSZip from "jszip";
 
 const DISTRESS_CLONE_BASE = "https://web-production-aad6d.up.railway.app";
 const DISTRESS_CLONE2_BASE = "https://distress-clone2.up.railway.app";
+const FINAL_DISTRESS_DETECTION_BASE = "https://distresssemifinal.up.railway.app";
 
 function getFilenameFromContentDisposition(headers, fallback) {
   const cd =
@@ -51,6 +52,47 @@ export async function generateDistressReport({ file, startDate, endDate, project
   const filename = getFilenameFromContentDisposition(
     response.headers,
     "distress_report.xlsx"
+  );
+  return { blob: response.data, filename };
+}
+
+export async function runRoadAnomalyScreening({
+  file,
+  startDate,
+  endDate,
+  lengthKm,
+  lanes,
+}) {
+  const formData = new FormData();
+  if (file) {
+    try {
+      const kmlFile = new File([file], file.name, {
+        type: "application/vnd.google-earth.kml+xml",
+      });
+      formData.append("kml_file", kmlFile);
+    } catch (_) {
+      formData.append("kml_file", file);
+    }
+  }
+  if (startDate) formData.append("start_date", startDate);
+  if (endDate) formData.append("end_date", endDate);
+  if (lengthKm !== undefined && lengthKm !== null && lengthKm !== "") {
+    formData.append("length_km", String(lengthKm));
+  }
+  if (lanes !== undefined && lanes !== null && lanes !== "") {
+    formData.append("lanes", String(lanes));
+  }
+
+  const response = await axios.post(`${FINAL_DISTRESS_DETECTION_BASE}/analyse`, formData, {
+    responseType: "blob",
+    headers: {
+      Accept: "application/zip, application/octet-stream, application/json",
+    },
+  });
+
+  const filename = getFilenameFromContentDisposition(
+    response.headers,
+    `road_anomaly_results_${startDate || "start"}_to_${endDate || "end"}.zip`
   );
   return { blob: response.data, filename };
 }

@@ -18,7 +18,7 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-leaflet": "4.2.1",
-    "react-leaflet-draw": "^0.21.0",
+    "react-leaflet-draw": "0.20.6",
     "react-router-dom": "^7.13.0",
     "react-scripts": "5.0.1",
     "serve": "^14.2.5",
@@ -27,6 +27,7 @@
     "xmldom": "^0.6.0"
   },
   "scripts": {
+    "dev": "node --max-http-header-size=65536 node_modules/react-scripts/bin/react-scripts.js start",
     "start": "node --max-http-header-size=65536 node_modules/react-scripts/bin/react-scripts.js start",
     "build": "node node_modules/react-scripts/bin/react-scripts.js build",
     "prod": "serve -s build",
