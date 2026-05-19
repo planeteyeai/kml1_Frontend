@@ -10,6 +10,7 @@ import DistressReport from "./DistressReport";
 import DistressReportClone2 from "./DistressReportClone2";
 import DistressPredicted from "./DistressPredicted";
 import FinalDistressDetection from "./FinalDistressDetection";
+import RigidPavementDistressDetection from "./RigidPavementDistressDetection";
 import InventoryCard from "./InventoryCard";
 import KMLSelection from "./KMLSelection";
 import KML1Form from "./KML1Form";
@@ -365,6 +366,26 @@ function MainKmlApp() {
                 <div className="landing-card-label">Final Distress Detection</div>
                 <div className="landing-card-description">
                   Run the final distress detection workflow and download outputs.
+                </div>
+                <div className="landing-card-footer">
+                  <span className="landing-card-cta secondary">Get Started</span>
+                </div>
+              </button>
+              <button
+                className="landing-card landing-card-secondary"
+                type="button"
+                onClick={() => navigate("/rigid-pavement-distress-detection")}
+              >
+                <div className="landing-card-logo landing-card-logo-distress">
+                  <img
+                    src="/Distress_report.png"
+                    alt="Rigid Pavement Distress Detection"
+                    className="landing-card-logo-image"
+                  />
+                </div>
+                <div className="landing-card-label">Rigid Pavement Distress Detection</div>
+                <div className="landing-card-description">
+                  PASS/FAIL rigid pavement classification with accurate dimensions.
                 </div>
                 <div className="landing-card-footer">
                   <span className="landing-card-cta secondary">Get Started</span>
@@ -1167,6 +1188,10 @@ function App() {
         <Route path="/distress-report-clone-2" element={<DistressReportClone2 />} />
         <Route path="/distress-predicted" element={<DistressPredicted />} />
         <Route path="/final-distress-detection" element={<FinalDistressDetection />} />
+        <Route
+          path="/rigid-pavement-distress-detection"
+          element={<RigidPavementDistressDetection />}
+        />
         <Route path="/inventory" element={<KMLSelection />} />
         <Route path="/inventory/kml-1" element={<KML1Form />} />
         <Route path="/inventory/kml-2" element={<KML2Form />} />
