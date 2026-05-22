@@ -114,10 +114,6 @@ function MainKmlApp() {
   const [offsetType, setOffsetType] = useState('');
   const [laneCount, setLaneCount] = useState('2');
   const [kmlMergeOffset, setKmlMergeOffset] = useState('');
-  const [projectName, setProjectName] = useState('');
-  const [startDate, setStartDate] = useState('2026-02-10');
-  const [endDate, setEndDate] = useState('2026-02-20');
-  const [imageDirection, setImageDirection] = useState('down_to_up');
   const [showPipeline, setShowPipeline] = useState(false);
   const [lastSavedPath, setLastSavedPath] = useState('');
   const [pipelineInitialPath, setPipelineInitialPath] = useState('');
@@ -144,10 +140,6 @@ function MainKmlApp() {
             setOffsetType(lastEntry.metadata.offsetType || '');
             setLaneCount(lastEntry.metadata.laneCount || '2');
             setKmlMergeOffset(lastEntry.metadata.kmlMergeOffset || '');
-            setProjectName(lastEntry.metadata.projectName || "");
-            setStartDate(lastEntry.metadata.startDate || '2026-02-10');
-            setEndDate(lastEntry.metadata.endDate || '2026-02-20');
-            setImageDirection(lastEntry.metadata.imageDirection || 'down_to_up');
           }
           if (lastEntry.geometry) {
             setInitialGeoJson({
@@ -165,10 +157,6 @@ function MainKmlApp() {
               setOffsetType(draft.metadata.offsetType || '');
               setLaneCount(draft.metadata.laneCount || '2');
               setKmlMergeOffset(draft.metadata.kmlMergeOffset || '');
-              setProjectName(draft.metadata.projectName || "");
-              setStartDate(draft.metadata.startDate || '2026-02-10');
-              setEndDate(draft.metadata.endDate || '2026-02-20');
-              setImageDirection(draft.metadata.imageDirection || 'down_to_up');
             }
             if (Array.isArray(draft.geometry) && draft.geometry.length > 0) {
               setInitialGeoJson({
@@ -192,10 +180,6 @@ function MainKmlApp() {
             setOffsetType(draft.metadata.offsetType || '');
             setLaneCount(draft.metadata.laneCount || '2');
             setKmlMergeOffset(draft.metadata.kmlMergeOffset || '');
-            setProjectName(draft.metadata.projectName || "");
-            setStartDate(draft.metadata.startDate || '2026-02-10');
-            setEndDate(draft.metadata.endDate || '2026-02-20');
-            setImageDirection(draft.metadata.imageDirection || 'down_to_up');
           }
           if (Array.isArray(draft.geometry) && draft.geometry.length > 0) {
             setInitialGeoJson({
@@ -416,10 +400,6 @@ function MainKmlApp() {
     setOffsetType('');
     setLaneCount('2');
     setKmlMergeOffset('');
-    setProjectName('');
-    setStartDate('2026-02-10');
-    setEndDate('2026-02-20');
-    setImageDirection('down_to_up');
     setInitialGeoJson(null);
     setLastSavedPath('');
     if (mapRef.current) {
@@ -529,7 +509,7 @@ function MainKmlApp() {
     const entries = Object.keys(resultsByImage || {})
       .map(parseChainageFromImageName)
       .filter(Boolean);
-    const project = toFileProjectName(projectName);
+    const project = toFileProjectName("");
     if (!entries.length) {
       return `${project}_Chainage_0.000_to_0.000`;
     }
@@ -626,7 +606,7 @@ function MainKmlApp() {
           Longitude: defect?.longitude ?? "",
           "Chainage Start": start,
           "Chainage End": end,
-          "Project Name": projectName || "",
+          "Project Name": "",
           "Distress Type": distressType,
           Direction: direction,
           Lane: sideValue,
@@ -697,7 +677,7 @@ function MainKmlApp() {
         rows.push({
           Latitude: toNumberOrBlank(defect?.latitude),
           Longitude: toNumberOrBlank(defect?.longitude),
-          "Project Name": projectName || "",
+          "Project Name": "",
           "Chainage Start": start,
           "Chainage End": end,
           "Total Distress": 1,
@@ -769,7 +749,7 @@ function MainKmlApp() {
           Longitude: "",
           "Chainage Start": parsed?.start ?? "",
           "Chainage End": parsed?.end ?? "",
-          "Project Name": projectName || "",
+          "Project Name": "",
           "Distress Type": "no_distress_detected",
           Direction: direction,
           Lane: sideValue,
@@ -789,7 +769,7 @@ function MainKmlApp() {
         rows.push({
           Latitude: "",
           Longitude: "",
-          "Project Name": projectName || "",
+          "Project Name": "",
           "Chainage Start": parsed?.start ?? "",
           "Chainage End": parsed?.end ?? "",
           "Total Distress": totalDistress,
@@ -944,10 +924,6 @@ function MainKmlApp() {
             offsetType={offsetType}
             laneCount={laneCount}
             kmlMergeOffset={kmlMergeOffset}
-            projectName={projectName}
-            startDate={startDate}
-            endDate={endDate}
-            imageDirection={imageDirection}
             onSaveSuccess={handleSaveSuccess}
             initialGeoJson={initialGeoJson}
           />
@@ -1022,57 +998,6 @@ function MainKmlApp() {
                   onChange={(e) => setKmlMergeOffset(e.target.value)}
                 />
               </div>
-            </div>
-          </div>
-          <div className="card card--compact">
-            <div className="kml-form-grid">
-              <div className="input-group">
-                <label htmlFor="start-date-input">Start Date</label>
-                <input
-                  id="start-date-input"
-                  type="date"
-                  className="sidebar-input distress-date-input"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label htmlFor="end-date-input">End Date</label>
-                <input
-                  id="end-date-input"
-                  type="date"
-                  className="sidebar-input distress-date-input"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-          <div className="card card--compact">
-            <div className="input-group input-group--full">
-              <label htmlFor="project-name-input">Project Name</label>
-              <input
-                id="project-name-input"
-                type="text"
-                placeholder="Enter project name"
-                className="sidebar-input"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="card card--compact">
-            <div className="input-group input-group--full">
-              <label htmlFor="image-direction-select">Direction</label>
-              <select
-                id="image-direction-select"
-                className="sidebar-input"
-                value={imageDirection}
-                onChange={(e) => setImageDirection(e.target.value)}
-              >
-                <option value="down_to_up">South To North</option>
-                <option value="up_to_down">North To South</option>
-              </select>
             </div>
           </div>
           <div className="card card--compact card--actions">

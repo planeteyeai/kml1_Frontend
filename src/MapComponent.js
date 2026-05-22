@@ -147,7 +147,49 @@ const featureCollectionToKml = (features = [], docName = 'Drawn KML') => {
 </kml>`;
 };
 
-const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffset, projectName, startDate, endDate, imageDirection, onSaveSuccess, initialGeoJson }, ref) => {
+const triggerKmlDownload = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const parseFilenameFromDisposition = (disposition, fallback) => {
+  if (!disposition) return fallback;
+  const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^";\n]+)/i);
+  return match ? decodeURIComponent(match[1].replace(/"/g, '').trim()) : fallback;
+};
+
+const downloadGeneratedKmlFromResponse = async (response, fallbackName = 'generated_kml.kml') => {
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
+  if (!response.ok) {
+    const text = await response.text();
+    let message = `Request failed (${response.status})`;
+    try {
+      const data = JSON.parse(text);
+      message = data.message || data.details || message;
+    } catch {
+      if (text) message = text;
+    }
+    throw new Error(message);
+  }
+  if (contentType.includes('application/json')) {
+    const data = await response.json();
+    throw new Error(data.message || data.details || 'No generated KML returned');
+  }
+  const blob = await response.blob();
+  const filename = parseFilenameFromDisposition(
+    response.headers.get('content-disposition'),
+    fallbackName
+  );
+  triggerKmlDownload(blob, filename);
+};
+
+const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffset, onSaveSuccess, initialGeoJson }, ref) => {
   const { token, user } = useAuth();
   const position = [18.5204, 73.8567]; // Pune center
   const [geoJsonData, setGeoJsonData] = useState(null);
@@ -199,28 +241,22 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
       formData.append('offsetType', offsetType);
       formData.append('laneCount', laneCount);
       formData.append('kmlMergeOffset', kmlMergeOffset);
-      formData.append('projectName', projectName || '');
-      formData.append('startDate', startDate || '');
-      formData.append('endDate', endDate || '');
-      formData.append('imageDirection', imageDirection || 'down_to_up');
 
       fetch(`${API_URL}/upload-kml`, {
         method: 'POST',
         headers: apiHeaders(token, user?.username),
         body: formData,
       })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          console.log("File uploaded successfully to:", data.path);
-          if (onSaveSuccess && data.pipelinePath) {
-            onSaveSuccess(data.pipelinePath);
-          }
-        } else {
-          console.error("Upload failed:", data.message);
+      .then(async (response) => {
+        await downloadGeneratedKmlFromResponse(response, file.name || 'generated_kml.kml');
+        if (onSaveSuccess) {
+          onSaveSuccess('Merge_KMLs');
         }
       })
-      .catch(error => console.error("Error uploading file:", error));
+      .catch(error => {
+        console.error("Error uploading file:", error);
+        alert(error.message || "Error uploading file");
+      });
 
       // 2. Read and display on map
       const reader = new FileReader();
@@ -305,10 +341,6 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
         offsetType,
         laneCount,
         kmlMergeOffset,
-        projectName,
-        startDate,
-        endDate,
-        imageDirection
       },
       geometry: allFeatures
     };
@@ -322,30 +354,14 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
         },
         body: JSON.stringify(payload),
       });
-      
-      const result = await response.json();
-      if (result.success) {
-        saveDraftLocally(payload);
-        setSaveStatus({ show: true, message: 'Data saved successfully!', type: 'success' });
-        if (onSaveSuccess && result.pipelinePath) {
-          onSaveSuccess(result.pipelinePath);
-        }
-        // Auto-hide success message after 3 seconds
-        setTimeout(() => setSaveStatus(prev => ({ ...prev, show: false })), 3000);
-      } else {
-        const savedLocally = saveDraftLocally(payload);
-        const detailText =
-          result && typeof result.details === "string" && result.details.trim()
-            ? ` Details: ${result.details}`
-            : "";
-        setSaveStatus({
-          show: true,
-          message: savedLocally
-            ? `Server save failed (${result.message || 'unknown error'}).${detailText} Draft saved locally on this device.`
-            : 'Error saving data: ' + (result.message || 'Unknown error') + detailText,
-          type: savedLocally ? 'success' : 'error'
-        });
+
+      await downloadGeneratedKmlFromResponse(response, 'generated_kml.kml');
+      saveDraftLocally(payload);
+      setSaveStatus({ show: true, message: 'KML generated and downloaded successfully!', type: 'success' });
+      if (onSaveSuccess) {
+        onSaveSuccess('Merge_KMLs');
       }
+      setTimeout(() => setSaveStatus(prev => ({ ...prev, show: false })), 3000);
     } catch (error) {
       console.error("Error saving data:", error);
       const savedLocally = saveDraftLocally(payload);
@@ -492,7 +508,7 @@ const MapComponent = forwardRef(({ chainage, offsetType, laneCount, kmlMergeOffs
       {isSaving && (
         <div className="loading-overlay">
           <div className="loading-spinner"></div>
-          <p>Saving data...</p>
+          <p>Generating KML...</p>
         </div>
       )}
       
